@@ -1,6 +1,6 @@
 module github.com/mark-chris/tmkb
 
-go 1.22
+go 1.25
 
 require (
 	github.com/spf13/cobra v1.8.0

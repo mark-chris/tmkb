@@ -40,7 +40,7 @@ This mental model shapes everything in TMKB:
 | Index | Tag-based + full-text | Simple, sufficient for MVP |
 
 ### Go Version
-- Go 1.22+
+- Go 1.25+
 
 ### Key Dependencies
 - Standard library for most functionality
