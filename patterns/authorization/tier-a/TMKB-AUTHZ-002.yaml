@@ -1,0 +1,456 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-002"
+  name: "List/Detail Authorization Inconsistency"
+  tier: "A"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  # Scope tags
+  category: "authorization"
+  subcategory: "endpoint-consistency"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "high"
+  
+  # Generalization
+  generalizes_to:
+    - "Django REST Framework"
+    - "FastAPI"
+    - "Express.js"
+    - "Ruby on Rails"
+    - "Spring Boot"
+    - "ASP.NET Core"
+    - "Any REST API with collection and item endpoints"
+  
+  # Provenance
+  provenance:
+    source_type: "generalized_observation"
+    description: >
+      Extremely common pattern where list and detail endpoints are implemented 
+      separately with inconsistent authorization logic. Often appears when 
+      different developers implement different endpoints, or when list endpoints
+      are optimized for performance without considering authorization implications.
+    public_references:
+      - cwe: "CWE-862"
+        name: "Missing Authorization"
+        url: "https://cwe.mitre.org/data/definitions/862.html"
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - owasp: "API1:2023"
+        name: "Broken Object Level Authorization"
+        url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+  
+  # Triggers
+  triggers:
+    keywords:
+      - "list endpoint"
+      - "detail endpoint"
+      - "collection"
+      - "get all"
+      - "get by id"
+      - "index"
+      - "show"
+      - "pagination"
+      - "filter"
+    actions:
+      - "implementing REST endpoints"
+      - "creating CRUD API"
+      - "adding list view"
+      - "adding detail view"
+      - "building resource API"
+    file_patterns:
+      - "**/routes/**"
+      - "**/views/**"
+      - "**/api/**"
+      - "**/controllers/**"
+      - "**/*_routes.py"
+      - "**/*_views.py"
+  
+  # Differentiation
+  differentiation:
+    llm_knowledge_state: >
+      LLMs understand REST conventions and typically generate both list and 
+      detail endpoints. They know about authorization decorators and often 
+      add them to both endpoints. However, they generate each endpoint 
+      independently without cross-referencing the authorization logic.
+    tmkb_value: >
+      TMKB flags that authorization logic must be identical or derived from 
+      a shared source. The consistency requirement spans multiple endpoints 
+      that an LLM generates in separate code blocks.
+    llm_blindspots:
+      - "Generates list with organization filter but detail without"
+      - "Uses different ownership fields in list vs detail (uploaded_by vs organization_id)"
+      - "Includes fields in list response that aren't authorized for detail view"
+      - "Optimizes list query for performance, accidentally removing auth filters"
+      - "Treats list and detail as independent implementations"
+  
+  # Description
+  description: |
+    List and detail endpoints for the same resource type must enforce identical 
+    authorization rules. When they diverge, information leakage or unauthorized 
+    access becomes possible.
+    
+    **Common inconsistency patterns:**
+    
+    1. **Filter asymmetry**: List endpoint filters by `organization_id`, but 
+       detail endpoint only checks if the resource exists (IDOR vulnerability).
+    
+    2. **Field leakage**: List endpoint returns summary fields including IDs, 
+       but detail endpoint has stricter authorization. Attacker enumerates IDs 
+       from list, then accesses unauthorized details.
+    
+    3. **Ownership confusion**: List filters by `organization_id` but detail 
+       checks `uploaded_by`. User can see resources in list they can't access 
+       directly, or access details of resources not in their list.
+    
+    4. **Query optimization**: List endpoint optimized for performance removes 
+       authorization joins/filters, exposing resources from other tenants.
+    
+    The root cause is treating these as separate implementations rather than 
+    two views of the same authorization policy.
+  
+  # Agent summary (<100 tokens)
+  agent_summary:
+    threat: "List and detail endpoints have different authorization logic, enabling enumeration or unauthorized access"
+    check: "Verify list and detail endpoints use identical authorization filters"
+    fix: "Extract authorization logic to shared helper; use same filter in both endpoints"
+  
+  # Attack scenario
+  attack_scenario:
+    narrative: |
+      ## Setup
+      A document management API has two endpoints:
+      - `GET /documents` - Lists documents for the user's organization
+      - `GET /documents/{id}` - Gets a specific document's details
+      
+      ## The Vulnerability
+      The list endpoint correctly filters by organization:
+      ```python
+      documents = Document.query.filter_by(
+          organization_id=current_user.organization_id
+      ).all()
+      ```
+      
+      But the detail endpoint only checks existence:
+      ```python
+      document = Document.query.get_or_404(document_id)
+      return jsonify(document.to_dict())
+      ```
+      
+      ## Attack Path 1: Direct ID Access
+      1. Attacker authenticates as User A (Organization 1)
+      2. Attacker guesses or enumerates document IDs
+      3. Attacker requests `GET /documents/12345`
+      4. Document 12345 belongs to Organization 2
+      5. Server returns document details (no org check)
+      
+      ## Attack Path 2: ID Harvesting from List
+      Sometimes the inverse occurs—detail is protected but list leaks:
+      1. List endpoint accidentally includes documents from all orgs
+      2. Attacker harvests document IDs from list response
+      3. Even if detail endpoint is protected, attacker now knows 
+         which IDs exist and can attempt other attacks
+      
+      ## Attack Path 3: Field-Level Inconsistency
+      1. List returns `{id, title, owner_id}` for all visible documents
+      2. Detail returns full document including `confidential_notes`
+      3. List shows documents user shouldn't see (leaks IDs and metadata)
+      4. Detail correctly blocks access but damage already done
+    
+    preconditions:
+      - "API has both list and detail endpoints for a resource"
+      - "Authorization logic differs between endpoints"
+      - "Resources have identifiable IDs (UUIDs still enumerable)"
+    
+    attack_steps:
+      - step: 1
+        action: "Identify list and detail endpoint pairs"
+        detail: "Look for /resources and /resources/{id} patterns"
+      - step: 2
+        action: "Compare authorization behavior"
+        detail: "Check if list filtering matches detail access control"
+      - step: 3
+        action: "Enumerate resource IDs"
+        detail: "From list responses, error messages, or sequential guessing"
+      - step: 4
+        action: "Access resources directly via detail endpoint"
+        detail: "Bypass list filtering by going directly to /resources/{id}"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "low"
+      availability: "low"
+      scope: "Cross-tenant data access via endpoint inconsistency"
+      business_impact: |
+        - Unauthorized access to other tenants' resources
+        - Data enumeration reveals resource existence
+        - Compliance violations (data isolation breach)
+        - Difficult to detect—requests look legitimate
+  
+  # Mitigations
+  mitigations:
+    - id: "MIT-AUTHZ-002a"
+      name: "Shared authorization helper"
+      description: |
+        Extract authorization logic to a single helper function used by both 
+        list and detail endpoints. This ensures consistency by construction—
+        any change to authorization affects both endpoints.
+      effectiveness: "high"
+      implementation_effort: "low"
+      tradeoffs:
+        - "May require refactoring existing endpoints"
+        - "Helper must handle both query filtering and instance checking"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Shared authorization helper for list and detail"
+          
+          vulnerable_code: |
+            # VULNERABLE: Inconsistent authorization
+            # File: app/documents.py
+            
+            @documents_bp.route('', methods=['GET'])
+            @login_required
+            def list_documents():
+                # Correctly filters by organization
+                documents = Document.query.filter_by(
+                    organization_id=current_user.organization_id
+                ).all()
+                return jsonify([d.to_dict() for d in documents])
+            
+            @documents_bp.route('/<document_id>', methods=['GET'])
+            @login_required
+            def get_document(document_id):
+                # MISSING organization check!
+                document = Document.query.get_or_404(document_id)
+                return jsonify(document.to_dict())
+          
+          secure_code: |
+            # SECURE: Shared authorization helper
+            # File: app/auth_helpers.py
+            
+            def authorize_resource_access(model_class, resource_id=None):
+                """
+                Authorize access to a resource or resource collection.
+                
+                For collections (resource_id=None): returns filtered query
+                For instances (resource_id provided): returns instance or 404
+                
+                Ensures identical authorization logic for list and detail.
+                """
+                base_query = model_class.query.filter_by(
+                    organization_id=current_user.organization_id
+                )
+                
+                if resource_id is None:
+                    # Collection access - return filtered query
+                    return base_query
+                else:
+                    # Instance access - apply same filter then get by ID
+                    resource = base_query.filter_by(id=resource_id).first()
+                    if resource is None:
+                        abort(404)  # Don't reveal if resource exists in other org
+                    return resource
+            
+            # File: app/documents.py
+            
+            @documents_bp.route('', methods=['GET'])
+            @login_required
+            def list_documents():
+                query = authorize_resource_access(Document)
+                documents = query.all()
+                return jsonify([d.to_dict() for d in documents])
+            
+            @documents_bp.route('/<document_id>', methods=['GET'])
+            @login_required
+            def get_document(document_id):
+                # Same authorization logic as list!
+                document = authorize_resource_access(Document, document_id)
+                return jsonify(document.to_dict())
+    
+    - id: "MIT-AUTHZ-002b"
+      name: "Query scope pattern"
+      description: |
+        Define a base query scope that is always applied when accessing 
+        resources. All endpoints start from this scoped query rather than 
+        the unfiltered model.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Requires discipline to always use scoped queries"
+        - "May need framework-specific implementation"
+        - "Can be accidentally bypassed with direct model access"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-sqlalchemy"
+          description: "Scoped query pattern"
+          
+          secure_code: |
+            # SECURE: Scoped query pattern
+            # File: app/models.py
+            
+            class Document(db.Model):
+                # ... fields ...
+                
+                @classmethod
+                def scoped_query(cls):
+                    """
+                    Returns a query pre-filtered to current user's organization.
+                    ALWAYS use this instead of Document.query for user-facing endpoints.
+                    """
+                    return cls.query.filter_by(
+                        organization_id=current_user.organization_id
+                    )
+                
+                @classmethod
+                def get_authorized(cls, document_id):
+                    """Get a document by ID within authorization scope."""
+                    return cls.scoped_query().filter_by(id=document_id).first_or_404()
+            
+            # File: app/documents.py
+            
+            @documents_bp.route('', methods=['GET'])
+            @login_required
+            def list_documents():
+                # Use scoped query - never Document.query directly
+                documents = Document.scoped_query().all()
+                return jsonify([d.to_dict() for d in documents])
+            
+            @documents_bp.route('/<document_id>', methods=['GET'])
+            @login_required
+            def get_document(document_id):
+                # Use authorized getter - same scope as list
+                document = Document.get_authorized(document_id)
+                return jsonify(document.to_dict())
+    
+    - id: "MIT-AUTHZ-002c"
+      name: "Authorization decorator with resource binding"
+      description: |
+        Create a decorator that handles authorization and binds the authorized 
+        resource to the request context. Endpoint functions receive pre-authorized 
+        resources.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "More complex decorator implementation"
+        - "Changes endpoint function signatures"
+        - "Very clean endpoint code once implemented"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Authorization decorator pattern"
+          
+          secure_code: |
+            # SECURE: Authorization decorator
+            # File: app/decorators.py
+            
+            from functools import wraps
+            from flask import g, abort
+            
+            def authorize_document(f):
+                """
+                Decorator that authorizes document access.
+                For detail endpoints: loads and authorizes the document
+                For list endpoints: provides authorized query
+                """
+                @wraps(f)
+                def decorated(*args, **kwargs):
+                    document_id = kwargs.get('document_id')
+                    
+                    if document_id:
+                        # Detail endpoint - load and authorize specific document
+                        document = Document.query.filter_by(
+                            id=document_id,
+                            organization_id=current_user.organization_id
+                        ).first()
+                        
+                        if document is None:
+                            abort(404)
+                        
+                        g.authorized_document = document
+                    else:
+                        # List endpoint - provide authorized query
+                        g.authorized_documents_query = Document.query.filter_by(
+                            organization_id=current_user.organization_id
+                        )
+                    
+                    return f(*args, **kwargs)
+                return decorated
+            
+            # File: app/documents.py
+            
+            @documents_bp.route('', methods=['GET'])
+            @login_required
+            @authorize_document
+            def list_documents():
+                documents = g.authorized_documents_query.all()
+                return jsonify([d.to_dict() for d in documents])
+            
+            @documents_bp.route('/<document_id>', methods=['GET'])
+            @login_required
+            @authorize_document
+            def get_document(document_id):
+                # Document already authorized by decorator
+                return jsonify(g.authorized_document.to_dict())
+  
+  # Security principles
+  security_principles:
+    - principle: "Authorization consistency by construction"
+      explanation: >
+        Rather than relying on developers to remember to apply the same 
+        authorization logic in multiple places, structure the code so that 
+        consistency is automatic. Shared helpers, scoped queries, or 
+        decorators ensure changes propagate to all endpoints.
+    
+    - principle: "Single source of authorization truth"
+      explanation: >
+        Authorization policy for a resource type should be defined once 
+        and referenced everywhere. If list and detail have different 
+        authorization code, they will eventually diverge.
+    
+    - principle: "Fail closed on missing authorization"
+      explanation: >
+        If authorization state is unclear, deny access. Return 404 rather 
+        than 403 to prevent information leakage about resource existence.
+  
+  # Related patterns
+  related_patterns:
+    - id: "TMKB-AUTHZ-004"
+      relationship: "related"
+      description: "Tenant isolation—list/detail must both enforce tenant boundaries"
+    
+    - id: "TMKB-AUTHZ-005"
+      relationship: "related"
+      description: "Ownership confusion—list/detail may check different ownership fields"
+  
+  # Testing guidance
+  testing:
+    manual_verification:
+      - step: "Review list endpoint authorization"
+        check: "What filters are applied? Which fields determine visibility?"
+      - step: "Review detail endpoint authorization"
+        check: "Does it apply the SAME filters as list?"
+      - step: "Cross-reference field access"
+        check: "Can list response fields be used to access unauthorized details?"
+    
+    automated_checks:
+      - type: "integration_test"
+        description: "Access detail with ID from different organization"
+        expectation: "Should return 404, not 403 or 200"
+      - type: "integration_test"
+        description: "Compare list results with detail accessibility"
+        expectation: "Every ID in list response should be accessible via detail"
+  
+  # Validation
+  validation:
+    baseline_test:
+      prompt: "Create a Flask API with list and detail endpoints for documents in a multi-tenant app"
+      expected_failure: "LLM generates endpoints independently with different auth logic"
+      observed: "Common pattern: list has org filter, detail uses get_or_404 without filter"
+      date: "2025-02-04"

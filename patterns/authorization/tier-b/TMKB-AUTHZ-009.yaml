@@ -1,0 +1,160 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-009"
+  name: "State Transition Authorization Bypass"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "state-transitions"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "medium"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - cwe: "CWE-841"
+        name: "Improper Enforcement of Behavioral Workflow"
+        url: "https://cwe.mitre.org/data/definitions/841.html"
+  
+  triggers:
+    keywords:
+      - "status"
+      - "state"
+      - "workflow"
+      - "transition"
+      - "approve"
+      - "reject"
+      - "publish"
+      - "draft"
+      - "pending"
+      - "completed"
+      - "enum"
+    actions:
+      - "implementing status changes"
+      - "adding workflow"
+      - "creating approval process"
+      - "implementing state machine"
+    file_patterns:
+      - "**/models/**"
+      - "**/workflows/**"
+      - "**/services/**"
+  
+  differentiation:
+    llm_blindspots:
+      - "Checks if user can update resource but not if they can make THIS status change"
+      - "Allows any status value without validating transition is permitted"
+      - "Doesn't consider that different transitions require different permissions"
+      - "Assumes 'can edit' means 'can change status to any value'"
+  
+  description: |
+    Resources often have status fields representing workflow states (draft → 
+    pending → approved → published). Authorization checks typically verify
+    "can user edit this resource" but not "can user perform THIS specific
+    state transition."
+    
+    Different transitions may require different authorization:
+    - draft → pending: author can submit
+    - pending → approved: only manager can approve
+    - approved → published: only admin can publish
+    - any → draft: may not be allowed once approved
+    
+    Without transition-specific authorization, users can skip workflow steps
+    or perform unauthorized state changes.
+  
+  agent_summary:
+    threat: "Status field updates allowed without checking if user is authorized for that specific state transition"
+    check: "Verify state changes check transition-specific permissions, not just general edit access"
+    fix: "Implement explicit transition authorization; validate allowed transitions per role"
+  
+  attack_scenario:
+    narrative: |
+      1. Document workflow: draft → review → approved → published
+      2. User has "editor" role, can submit for review (draft → review)
+      3. Only "approver" role should approve (review → approved)
+      4. Update endpoint checks: can user edit this document? Yes.
+      5. Attacker (editor) sends: PATCH /documents/123 {"status": "approved"}
+      6. Document is approved without approver review
+    
+    preconditions:
+      - "Resource has status/state field"
+      - "Different transitions require different permissions"
+      - "Update endpoint doesn't validate transition authorization"
+    
+    impact:
+      confidentiality: "low"
+      integrity: "high"
+      availability: "low"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-009"
+      description: "Implement transition-specific authorization"
+      effectiveness: "high"
+      implementation_effort: "medium"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "State transition authorization"
+          
+          secure_code: |
+            # SECURE: Transition-specific authorization
+            
+            # Define allowed transitions per role
+            ALLOWED_TRANSITIONS = {
+                'author': {
+                    ('draft', 'review'),      # Submit for review
+                    ('review', 'draft'),      # Withdraw from review
+                },
+                'approver': {
+                    ('review', 'approved'),   # Approve
+                    ('review', 'draft'),      # Reject (back to draft)
+                },
+                'admin': {
+                    ('approved', 'published'), # Publish
+                    ('published', 'archived'), # Archive
+                },
+            }
+            
+            def can_transition(user, document, new_status):
+                """Check if user can perform this specific transition."""
+                current = document.status
+                transition = (current, new_status)
+                
+                for role in user.roles:
+                    if transition in ALLOWED_TRANSITIONS.get(role, set()):
+                        return True
+                return False
+            
+            @documents_bp.route('/<doc_id>', methods=['PATCH'])
+            @login_required
+            def update_document(doc_id):
+                document = get_authorized_document(doc_id)
+                data = request.get_json()
+                
+                # If status change requested, check transition auth
+                if 'status' in data:
+                    new_status = data['status']
+                    if not can_transition(current_user, document, new_status):
+                        return jsonify({
+                            'error': f'Not authorized to transition from {document.status} to {new_status}'
+                        }), 403
+                    document.status = new_status
+                
+                # Update other allowed fields...
+                db.session.commit()
+                return jsonify(document.to_dict())
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-003"
+      relationship: "related"
+      description: "Soft-delete is a special case of state transition"
+    - id: "TMKB-AUTHZ-006"
+      relationship: "related"
+      description: "Mass assignment can be used to set unauthorized status values"

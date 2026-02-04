@@ -1,0 +1,477 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-003"
+  name: "Soft-Delete Resurrection Attack"
+  tier: "A"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  # Scope tags
+  category: "authorization"
+  subcategory: "state-transitions"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "medium"
+  
+  # Generalization
+  generalizes_to:
+    - "Django with soft-delete mixins"
+    - "FastAPI with SQLAlchemy"
+    - "Rails with paranoia/discard gems"
+    - "Node.js with Sequelize paranoid mode"
+    - "Any ORM with soft-delete pattern"
+    - "Any system using status fields instead of hard deletes"
+  
+  # Provenance
+  provenance:
+    source_type: "generalized_observation"
+    description: >
+      Soft-delete is a common pattern for data retention and audit compliance.
+      However, authorization checks often only verify existence and ownership,
+      not deletion state. This allows "deleted" resources to be resurrected
+      or manipulated through update endpoints.
+    public_references:
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - cwe: "CWE-672"
+        name: "Operation on a Resource after Expiration or Release"
+        url: "https://cwe.mitre.org/data/definitions/672.html"
+  
+  # Triggers
+  triggers:
+    keywords:
+      - "soft delete"
+      - "soft-delete"
+      - "deleted_at"
+      - "is_deleted"
+      - "is_active"
+      - "archived"
+      - "status"
+      - "paranoid"
+      - "logical delete"
+      - "tombstone"
+    actions:
+      - "implementing soft delete"
+      - "adding delete endpoint"
+      - "implementing archive feature"
+      - "adding status field"
+      - "implementing undo delete"
+    file_patterns:
+      - "**/models/**"
+      - "**/*_model.py"
+      - "**/mixins/**"
+  
+  # Differentiation
+  differentiation:
+    llm_knowledge_state: >
+      LLMs understand soft-delete as a pattern and can implement it correctly
+      (setting deleted_at timestamp, filtering in queries). They know to 
+      exclude soft-deleted records from list endpoints.
+    tmkb_value: >
+      TMKB flags that update/patch endpoints must also check deletion state.
+      The authorization check "user owns this resource" is incomplete—it 
+      must also verify "and the resource is not deleted."
+    llm_blindspots:
+      - "Adds deleted_at filter to SELECT but not to UPDATE authorization"
+      - "Allows status field changes on deleted resources"
+      - "Doesn't consider that PATCH can resurrect by clearing deleted_at"
+      - "Treats deletion state as display logic rather than authorization"
+  
+  # Description
+  description: |
+    Soft-delete implementations mark records as deleted (typically via a 
+    `deleted_at` timestamp or `is_deleted` flag) rather than removing them 
+    from the database. This is common for audit trails, compliance, and 
+    undo functionality.
+    
+    **The vulnerability arises when:**
+    
+    1. **Read operations** correctly filter out soft-deleted records
+    2. **Update operations** only check ownership, not deletion state
+    
+    This allows an attacker to:
+    
+    - **Resurrect deleted resources**: PATCH the resource to clear `deleted_at` 
+      or set `is_deleted=false`, bringing it back to active state
+    
+    - **Modify deleted resources**: Change data on "deleted" resources that 
+      should be immutable for audit purposes
+    
+    - **Bypass business logic**: If deletion triggered downstream effects 
+      (notifications, cleanup jobs), resurrection bypasses those
+    
+    - **Access deleted data**: Even if the resource can't be resurrected, 
+      the update response might leak the deleted resource's current state
+    
+    The core issue: **deletion state is an authorization concern**, not just 
+    a query filter. A deleted resource should not be modifiable regardless 
+    of ownership.
+  
+  # Agent summary (<100 tokens)
+  agent_summary:
+    threat: "Soft-deleted resources can be modified or resurrected via update endpoints that don't check deletion state"
+    check: "Verify all update/patch endpoints check deletion state before allowing modifications"
+    fix: "Add deleted_at/is_deleted check to authorization, not just read queries"
+  
+  # Attack scenario
+  attack_scenario:
+    narrative: |
+      ## Setup
+      A project management API uses soft-delete for tasks:
+      - Tasks have `deleted_at` timestamp (null = active, set = deleted)
+      - `GET /tasks` filters out deleted tasks
+      - `DELETE /tasks/{id}` sets `deleted_at = now()`
+      - `PATCH /tasks/{id}` updates task fields
+      
+      ## The Vulnerability
+      The list endpoint correctly excludes deleted tasks:
+      ```python
+      tasks = Task.query.filter_by(
+          organization_id=current_user.organization_id,
+          deleted_at=None  # Excludes soft-deleted
+      ).all()
+      ```
+      
+      But the update endpoint only checks ownership:
+      ```python
+      task = Task.query.get_or_404(task_id)
+      if task.organization_id != current_user.organization_id:
+          abort(404)
+      # No check for deleted_at!
+      task.title = data.get('title', task.title)
+      ```
+      
+      ## Attack Path 1: Resurrection
+      1. Admin deletes Task 123 (sets deleted_at)
+      2. Task disappears from list view
+      3. Attacker (who knew the task ID) sends:
+         `PATCH /tasks/123 {"deleted_at": null}`
+      4. Task is resurrected and reappears in list
+      5. Audit trail shows deletion but task is active
+      
+      ## Attack Path 2: Zombie Modification
+      1. Task 456 is deleted, containing sensitive project data
+      2. Compliance requires deleted data be immutable
+      3. Attacker modifies the "deleted" task:
+         `PATCH /tasks/456 {"notes": "modified after deletion"}`
+      4. Audit integrity is compromised
+      
+      ## Attack Path 3: Information Disclosure
+      1. Task 789 is deleted by another user
+      2. Attacker attempts update:
+         `PATCH /tasks/789 {"title": "test"}`
+      3. Response includes current task data (even if update fails)
+      4. Attacker learns deleted task's contents
+    
+    preconditions:
+      - "Application uses soft-delete pattern"
+      - "Attacker knows or can guess resource IDs"
+      - "Update endpoint doesn't verify deletion state"
+    
+    attack_steps:
+      - step: 1
+        action: "Identify soft-delete implementation"
+        detail: "Look for deleted_at, is_deleted, or status fields in API responses"
+      - step: 2
+        action: "Find or guess deleted resource IDs"
+        detail: "From prior access, sequential IDs, or timing attacks"
+      - step: 3
+        action: "Attempt update on deleted resource"
+        detail: "PATCH with field changes or deletion flag manipulation"
+      - step: 4
+        action: "Verify resurrection or modification"
+        detail: "Check if resource reappears in list or data was changed"
+    
+    impact:
+      confidentiality: "medium"
+      integrity: "high"
+      availability: "low"
+      scope: "Data integrity violation, audit trail compromise, business logic bypass"
+      business_impact: |
+        - Compliance failures (immutable audit records modified)
+        - Business logic circumvention (deleted items reactivated)
+        - Data integrity issues (zombie records in unexpected states)
+        - Potential privilege escalation if deletion was a security control
+  
+  # Mitigations
+  mitigations:
+    - id: "MIT-AUTHZ-003a"
+      name: "Include deletion state in authorization check"
+      description: |
+        Extend the authorization check to verify both ownership AND active state.
+        Treat deleted resources as "not found" for authorization purposes.
+      effectiveness: "high"
+      implementation_effort: "low"
+      tradeoffs:
+        - "Must update all endpoints that modify resources"
+        - "Need to decide on 404 vs 410 (Gone) response"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Authorization check including deletion state"
+          
+          vulnerable_code: |
+            # VULNERABLE: Doesn't check deletion state
+            # File: app/tasks.py
+            
+            @tasks_bp.route('/<task_id>', methods=['PATCH'])
+            @login_required
+            def update_task(task_id):
+                task = Task.query.get_or_404(task_id)
+                
+                # Only checks ownership, not deletion state
+                if task.organization_id != current_user.organization_id:
+                    abort(404)
+                
+                data = request.get_json()
+                task.title = data.get('title', task.title)
+                task.status = data.get('status', task.status)
+                # Attacker could even do: task.deleted_at = data.get('deleted_at')
+                
+                db.session.commit()
+                return jsonify(task.to_dict())
+          
+          secure_code: |
+            # SECURE: Checks deletion state in authorization
+            # File: app/tasks.py
+            
+            def get_active_task_or_404(task_id):
+                """
+                Get a task by ID, verifying:
+                1. Task exists
+                2. Task belongs to current user's organization
+                3. Task is not soft-deleted
+                
+                Returns 404 for all failure cases (no information leakage).
+                """
+                task = Task.query.filter_by(
+                    id=task_id,
+                    organization_id=current_user.organization_id,
+                    deleted_at=None  # Must not be deleted
+                ).first()
+                
+                if task is None:
+                    abort(404)
+                
+                return task
+            
+            @tasks_bp.route('/<task_id>', methods=['PATCH'])
+            @login_required
+            def update_task(task_id):
+                # Authorization includes deletion state check
+                task = get_active_task_or_404(task_id)
+                
+                data = request.get_json()
+                
+                # Whitelist allowed fields - never allow deleted_at modification
+                allowed_fields = {'title', 'description', 'status', 'due_date'}
+                for field in allowed_fields:
+                    if field in data:
+                        setattr(task, field, data[field])
+                
+                db.session.commit()
+                return jsonify(task.to_dict())
+    
+    - id: "MIT-AUTHZ-003b"
+      name: "Immutable soft-deleted records"
+      description: |
+        Make soft-deleted records completely immutable at the model level.
+        Any attempt to modify a deleted record raises an error before 
+        the database is touched.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Requires model-level hooks or mixins"
+        - "May complicate legitimate admin operations"
+        - "Need escape hatch for actual data corrections"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-sqlalchemy"
+          description: "Model-level immutability for deleted records"
+          
+          secure_code: |
+            # SECURE: Model enforces immutability when deleted
+            # File: app/models/mixins.py
+            
+            from sqlalchemy import event
+            from sqlalchemy.orm import validates
+            
+            class SoftDeleteMixin:
+                """
+                Mixin that provides soft-delete with immutability enforcement.
+                Deleted records cannot be modified through normal operations.
+                """
+                deleted_at = db.Column(db.DateTime, nullable=True, index=True)
+                deleted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+                
+                @property
+                def is_deleted(self):
+                    return self.deleted_at is not None
+                
+                def soft_delete(self, user_id):
+                    """Mark record as deleted."""
+                    if self.is_deleted:
+                        raise ValueError("Record is already deleted")
+                    self.deleted_at = datetime.utcnow()
+                    self.deleted_by = user_id
+                
+                @classmethod
+                def active_query(cls):
+                    """Query that excludes soft-deleted records."""
+                    return cls.query.filter_by(deleted_at=None)
+            
+            @event.listens_for(SoftDeleteMixin, 'before_update', propagate=True)
+            def check_not_deleted_before_update(mapper, connection, target):
+                """
+                SQLAlchemy event that prevents updates to deleted records.
+                This is a defense-in-depth measure at the ORM level.
+                """
+                # Get the original deleted_at value from database
+                state = db.inspect(target)
+                history = state.attrs.deleted_at.history
+                
+                # If deleted_at was already set (not being set now), block update
+                if not history.has_changes() and target.deleted_at is not None:
+                    raise PermissionError(
+                        f"Cannot modify deleted {target.__class__.__name__} "
+                        f"(id={target.id}, deleted_at={target.deleted_at})"
+                    )
+            
+            # File: app/models/task.py
+            
+            class Task(db.Model, SoftDeleteMixin):
+                __tablename__ = 'tasks'
+                
+                id = db.Column(db.Integer, primary_key=True)
+                title = db.Column(db.String(255), nullable=False)
+                organization_id = db.Column(db.Integer, nullable=False)
+                # ... other fields ...
+            
+            # Usage in endpoint - even if authorization check is missed,
+            # the model-level event prevents modification
+    
+    - id: "MIT-AUTHZ-003c"
+      name: "Field-level update protection"
+      description: |
+        Explicitly whitelist fields that can be updated via API endpoints.
+        Never allow deletion-related fields to be modified through normal
+        update operations.
+      effectiveness: "medium"
+      implementation_effort: "low"
+      tradeoffs:
+        - "Doesn't prevent modification of other fields on deleted records"
+        - "Must maintain field whitelist as model evolves"
+        - "Should be combined with MIT-AUTHZ-003a"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Field whitelist for updates"
+          
+          secure_code: |
+            # SECURE: Explicit field whitelist
+            # File: app/tasks.py
+            
+            # Define allowed fields at module level for clarity
+            TASK_UPDATABLE_FIELDS = frozenset({
+                'title',
+                'description', 
+                'status',
+                'due_date',
+                'assignee_id',
+                'priority'
+            })
+            
+            # Fields that should NEVER be updatable via API
+            TASK_PROTECTED_FIELDS = frozenset({
+                'id',
+                'created_at',
+                'created_by',
+                'deleted_at',      # Prevent resurrection
+                'deleted_by',
+                'organization_id'  # Prevent tenant transfer
+            })
+            
+            @tasks_bp.route('/<task_id>', methods=['PATCH'])
+            @login_required
+            def update_task(task_id):
+                task = get_active_task_or_404(task_id)
+                data = request.get_json()
+                
+                # Check for attempts to modify protected fields
+                attempted_protected = set(data.keys()) & TASK_PROTECTED_FIELDS
+                if attempted_protected:
+                    return jsonify({
+                        'error': f'Cannot modify protected fields: {attempted_protected}'
+                    }), 400
+                
+                # Only update allowed fields
+                for field in TASK_UPDATABLE_FIELDS:
+                    if field in data:
+                        setattr(task, field, data[field])
+                
+                db.session.commit()
+                return jsonify(task.to_dict())
+  
+  # Security principles
+  security_principles:
+    - principle: "Deletion state is authorization, not display"
+      explanation: >
+        Soft-delete is often implemented as a display filter (don't show 
+        deleted items) rather than an authorization control (deleted items 
+        cannot be accessed or modified). The latter is the correct model.
+    
+    - principle: "Audit immutability"
+      explanation: >
+        Once a record is marked as deleted, it should be effectively 
+        immutable for audit purposes. The deletion timestamp and the 
+        record's state at deletion should be preserved.
+    
+    - principle: "Defense in depth for state transitions"
+      explanation: >
+        State changes (active → deleted) should be enforced at multiple 
+        levels: API authorization, model validation, and database constraints.
+        Any single layer might be bypassed.
+  
+  # Related patterns
+  related_patterns:
+    - id: "TMKB-AUTHZ-001"
+      relationship: "related"
+      description: "Background jobs may process soft-deleted resources if not checking state"
+    
+    - id: "TMKB-AUTHZ-002"
+      relationship: "extends"
+      description: "List/detail consistency must include deletion state filtering"
+  
+  # Testing guidance
+  testing:
+    manual_verification:
+      - step: "Identify soft-delete implementation"
+        check: "Which fields indicate deletion? deleted_at, is_deleted, status?"
+      - step: "Review update endpoint authorization"
+        check: "Does it check deletion state before allowing changes?"
+      - step: "Test resurrection attempt"
+        check: "Can you PATCH deleted_at=null on a deleted resource?"
+    
+    automated_checks:
+      - type: "integration_test"
+        description: "PATCH deleted resource with field changes"
+        expectation: "Should return 404, not 200"
+      - type: "integration_test"
+        description: "PATCH deleted resource with deleted_at=null"
+        expectation: "Should return 404 or 400, resource should remain deleted"
+      - type: "static_analysis"
+        description: "Find update handlers that don't filter by deleted_at"
+        pattern: "Model.query.get.*PATCH|PUT"
+  
+  # Validation
+  validation:
+    baseline_test:
+      prompt: "Create a Flask API with soft-delete for tasks in a multi-tenant app"
+      expected_failure: "LLM filters deleted in GET but not in PATCH authorization"
+      observed: "List excludes deleted, but update uses query.get_or_404 without deleted check"
+      date: "2025-02-04"

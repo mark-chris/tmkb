@@ -1,0 +1,144 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-012"
+  name: "Inconsistent Authorization in Bulk Operations"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "bulk-operations"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "medium"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+  
+  triggers:
+    keywords:
+      - "bulk"
+      - "batch"
+      - "multiple"
+      - "mass"
+      - "ids"
+      - "all"
+      - "many"
+      - "import"
+      - "export"
+      - "array"
+      - "list of"
+    actions:
+      - "implementing bulk delete"
+      - "adding batch update"
+      - "creating export endpoint"
+      - "implementing bulk import"
+    file_patterns:
+      - "**/routes/**"
+      - "**/api/**"
+      - "**/batch/**"
+  
+  differentiation:
+    llm_blindspots:
+      - "Single-item endpoint checks auth, but bulk endpoint operates on array without per-item check"
+      - "Bulk delete accepts list of IDs and deletes without verifying each"
+      - "Export endpoint dumps all matching records without filtering by authorization"
+      - "Assumes if user can access one item, bulk operation on list is safe"
+  
+  description: |
+    Bulk operation endpoints (batch delete, mass update, export) often have
+    weaker authorization than their single-item counterparts. The single-item
+    endpoint carefully checks ownership; the bulk endpoint accepts a list of
+    IDs and operates on all of them.
+    
+    Attack patterns:
+    - POST /items/delete with body {"ids": [1, 2, 999]} where 999 is unauthorized
+    - GET /items/export that returns all items without tenant filter
+    - POST /items/batch-update that modifies items across tenants
+    
+    Performance optimization (avoiding N queries) often leads to skipped authorization.
+  
+  agent_summary:
+    threat: "Bulk operation endpoints skip per-item authorization that single-item endpoints enforce"
+    check: "Verify bulk endpoints authorize every item in the batch, not just the request"
+    fix: "Filter bulk operations through authorization; reject if ANY item unauthorized"
+  
+  attack_scenario:
+    narrative: |
+      1. DELETE /documents/{id} correctly checks ownership
+      2. POST /documents/bulk-delete added for convenience
+      3. Bulk endpoint: `Document.query.filter(Document.id.in_(ids)).delete()`
+      4. No organization filter in bulk operation!
+      5. Attacker sends: {"ids": [own_doc_1, own_doc_2, victim_doc_99]}
+      6. All three documents deleted, including victim's
+    
+    preconditions:
+      - "API has bulk operation endpoints"
+      - "Bulk endpoint doesn't verify per-item authorization"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "high"
+      availability: "medium"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-012"
+      description: "Apply authorization filter to bulk operations"
+      effectiveness: "high"
+      implementation_effort: "medium"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Authorized bulk operations"
+          
+          secure_code: |
+            # SECURE: Bulk delete with authorization
+            @documents_bp.route('/bulk-delete', methods=['POST'])
+            @login_required
+            def bulk_delete():
+                data = request.get_json()
+                ids = data.get('ids', [])
+                
+                if not ids or len(ids) > 100:  # Limit batch size
+                    return jsonify({'error': 'Invalid ID list'}), 400
+                
+                # Filter by BOTH requested IDs AND authorization
+                authorized_docs = Document.query.filter(
+                    Document.id.in_(ids),
+                    Document.organization_id == current_user.organization_id
+                ).all()
+                
+                # Check if all requested IDs were authorized
+                authorized_ids = {doc.id for doc in authorized_docs}
+                unauthorized_ids = set(ids) - authorized_ids
+                
+                if unauthorized_ids:
+                    # Option 1: Reject entire batch (strict)
+                    return jsonify({
+                        'error': 'Some documents not found or not authorized',
+                        'unauthorized_count': len(unauthorized_ids)
+                    }), 403
+                    
+                    # Option 2: Process only authorized (lenient, log unauthorized)
+                    # logger.warning(f"Bulk delete skipped unauthorized: {unauthorized_ids}")
+                
+                # Delete only authorized documents
+                for doc in authorized_docs:
+                    db.session.delete(doc)
+                
+                db.session.commit()
+                return jsonify({'deleted': len(authorized_docs)})
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-004"
+      relationship: "extends"
+      description: "Bulk operations are high-risk for tenant isolation failures"
+    - id: "TMKB-AUTHZ-007"
+      relationship: "related"
+      description: "IDOR amplified across multiple IDs"

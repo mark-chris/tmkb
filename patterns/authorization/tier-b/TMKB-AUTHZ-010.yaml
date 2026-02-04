@@ -1,0 +1,129 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-010"
+  name: "Unauthorized Access via Relationship Traversal"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "object-references"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "medium"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-639"
+        name: "Authorization Bypass Through User-Controlled Key"
+        url: "https://cwe.mitre.org/data/definitions/639.html"
+  
+  triggers:
+    keywords:
+      - "nested"
+      - "relationship"
+      - "foreign key"
+      - "parent"
+      - "child"
+      - "belongs_to"
+      - "has_many"
+      - "join"
+      - "related"
+      - "comments"
+      - "attachments"
+      - "subresource"
+    actions:
+      - "implementing nested routes"
+      - "adding related resources endpoint"
+      - "fetching child objects"
+      - "creating subresource API"
+    file_patterns:
+      - "**/routes/**"
+      - "**/api/**"
+  
+  differentiation:
+    llm_blindspots:
+      - "Authorizes parent resource but not nested/related resources"
+      - "Assumes if user can access project, they can access all comments"
+      - "Doesn't verify related object belongs to the authorized parent"
+      - "Nested route /projects/123/comments/456 doesn't verify comment 456 belongs to project 123"
+  
+  description: |
+    When APIs expose nested resources (/projects/{id}/comments/{comment_id}),
+    authorization often checks only the parent resource. This allows attackers
+    to access child resources from other parents by manipulating the child ID.
+    
+    Additionally, ORM relationship traversal (project.comments, user.documents)
+    may bypass authorization checks that were applied to direct queries.
+    
+    The child ID in the URL might not even belong to the parent—server must verify.
+  
+  agent_summary:
+    threat: "Nested resource endpoints verify parent access but not that child belongs to parent, or that child has same authorization"
+    check: "Verify nested routes validate parent-child relationship AND child authorization"
+    fix: "Always filter child by parent ID; apply child-specific authorization rules"
+  
+  attack_scenario:
+    narrative: |
+      1. GET /projects/123/comments/456 - nested comment endpoint
+      2. Server checks: can user access project 123? Yes.
+      3. Server fetches: Comment.query.get(456)
+      4. But comment 456 belongs to project 789 (different org!)
+      5. User reads comment from unauthorized project
+      
+      Variant: Even if comment is in project 123, comment might be
+      private/draft and user shouldn't see it despite project access.
+    
+    preconditions:
+      - "API has nested resource routes"
+      - "Child resource fetched by ID without parent verification"
+      - "Child may have different authorization than parent"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "medium"
+      availability: "low"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-010"
+      description: "Verify parent-child relationship and child authorization"
+      effectiveness: "high"
+      implementation_effort: "low"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Secure nested resource access"
+          
+          secure_code: |
+            # SECURE: Verify relationship and authorization
+            @projects_bp.route('/<project_id>/comments/<comment_id>', methods=['GET'])
+            @login_required
+            def get_comment(project_id, comment_id):
+                # 1. Authorize parent (project)
+                project = Project.query.filter_by(
+                    id=project_id,
+                    organization_id=current_user.organization_id
+                ).first_or_404()
+                
+                # 2. Fetch child WITH parent filter (verify relationship)
+                comment = Comment.query.filter_by(
+                    id=comment_id,
+                    project_id=project_id  # MUST belong to this project
+                ).first_or_404()
+                
+                # 3. Apply child-specific authorization if needed
+                if comment.is_private and comment.author_id != current_user.id:
+                    abort(404)  # Private comment, not author
+                
+                return jsonify(comment.to_dict())
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-007"
+      relationship: "extends"
+      description: "IDOR on child resources via relationship traversal"
+    - id: "TMKB-AUTHZ-005"
+      relationship: "related"
+      description: "Child resources may have different ownership rules than parent"

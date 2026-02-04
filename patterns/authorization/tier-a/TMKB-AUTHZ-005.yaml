@@ -1,0 +1,629 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-005"
+  name: "User-Account-Resource Ownership Confusion"
+  tier: "A"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  # Scope tags
+  category: "authorization"
+  subcategory: "ownership-models"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "high"
+  
+  # Generalization
+  generalizes_to:
+    - "Django with multi-level permissions"
+    - "FastAPI with organization/team models"
+    - "Rails with CanCanCan/Pundit"
+    - "Node.js with CASL"
+    - "Any application with team/organization membership"
+    - "B2B SaaS with workspace models"
+  
+  # Provenance
+  provenance:
+    source_type: "generalized_observation"
+    description: >
+      Applications with organization/team models often confuse three distinct
+      authorization relationships: (1) user membership in organization, 
+      (2) user ownership of specific resources, (3) organization ownership
+      of resources. Checking one doesn't imply the others.
+    public_references:
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - cwe: "CWE-639"
+        name: "Authorization Bypass Through User-Controlled Key"
+        url: "https://cwe.mitre.org/data/definitions/639.html"
+      - owasp: "API1:2023"
+        name: "Broken Object Level Authorization"
+        url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+  
+  # Triggers
+  triggers:
+    keywords:
+      - "organization"
+      - "team"
+      - "workspace"
+      - "account"
+      - "company"
+      - "member"
+      - "owner"
+      - "created_by"
+      - "owned_by"
+      - "belongs to"
+      - "permissions"
+      - "roles"
+    actions:
+      - "implementing team features"
+      - "adding organization support"
+      - "creating workspace model"
+      - "implementing resource ownership"
+      - "adding member permissions"
+    file_patterns:
+      - "**/models/**"
+      - "**/permissions/**"
+      - "**/auth/**"
+      - "**/*_permissions.py"
+      - "**/*_policy.py"
+  
+  # Differentiation
+  differentiation:
+    llm_knowledge_state: >
+      LLMs understand that users belong to organizations and that resources
+      belong to organizations. They can implement organization_id foreign
+      keys and basic membership checks. They know about RBAC concepts.
+    tmkb_value: >
+      TMKB clarifies that "user is in organization" ≠ "user can access all 
+      organization resources" ≠ "user owns this specific resource." These
+      are three distinct authorization checks that get conflated.
+    llm_blindspots:
+      - "Checks organization membership but not resource-level permission"
+      - "Assumes 'user created resource' = 'only user who can access it'"
+      - "Doesn't distinguish viewer/editor/admin within organization"
+      - "Conflates 'organization owns resource' with 'user can modify resource'"
+      - "Misses that some resources are user-private within an organization"
+      - "Doesn't handle shared resources within teams"
+  
+  # Description
+  description: |
+    In applications with organization/team models, there are typically 
+    **three distinct ownership/access relationships** that get confused:
+    
+    ## The Three Relationships
+    
+    **1. User ↔ Organization (Membership)**
+    - Is the user a member of this organization?
+    - What role does the user have? (admin, member, viewer)
+    - This is about *who the user is* in the org context
+    
+    **2. Resource ↔ Organization (Tenant Ownership)**
+    - Does this resource belong to this organization?
+    - This is tenant isolation (covered in TMKB-AUTHZ-004)
+    - All org members might see it, but that's a policy choice
+    
+    **3. User ↔ Resource (Direct Ownership/Permission)**
+    - Did this user create this resource?
+    - Is this user assigned to this resource?
+    - Does this user have explicit permission for this resource?
+    - This is about *what the user can do* with specific resources
+    
+    ## Common Confusion Patterns
+    
+    **"User owns account" ≠ "User owns all resources under account"**
+    - User is org admin → doesn't mean they can access all private documents
+    - User created project → doesn't mean only they can view it
+    
+    **Checking #1 instead of #3:**
+    ```python
+    # WRONG: Only checks org membership
+    if resource.organization_id == current_user.organization_id:
+        allow_access()  # But is this THEIR resource?
+    ```
+    
+    **Checking #3 instead of #1+#2:**
+    ```python
+    # WRONG: Only checks creator
+    if resource.created_by == current_user.id:
+        allow_access()  # But is resource still in user's org?
+    ```
+    
+    The correct check depends on the access policy, but all three 
+    relationships must be explicitly considered.
+  
+  # Agent summary (<100 tokens)
+  agent_summary:
+    threat: "Authorization conflates org membership, resource ownership by org, and resource ownership by user—checking one doesn't imply others"
+    check: "Verify access rules distinguish: user-in-org, org-owns-resource, user-owns-resource"
+    fix: "Explicitly model all three relationships; check the ones relevant to each operation"
+  
+  # Attack scenario
+  attack_scenario:
+    narrative: |
+      ## Setup
+      A document management SaaS has:
+      - Organizations with members
+      - Documents that belong to organizations
+      - Documents can be "private" (only creator) or "shared" (all org members)
+      - Users have roles: admin, member, viewer
+      
+      The data model:
+      ```python
+      class Document:
+          organization_id  # Which org owns this
+          created_by       # Which user created it
+          visibility       # 'private' or 'shared'
+      ```
+      
+      ## Vulnerability 1: Org Check Without Visibility Check
+      
+      The developer implements:
+      ```python
+      def can_view_document(user, document):
+          # Only checks organization membership
+          return document.organization_id == user.organization_id
+      ```
+      
+      **Attack:**
+      1. Alice creates private document in Org A
+      2. Bob (also in Org A) accesses Alice's private document
+      3. Authorization passes because Bob is in Org A
+      4. But the document was meant to be private to Alice!
+      
+      ## Vulnerability 2: Creator Check Without Org Check
+      
+      The developer implements:
+      ```python
+      def can_edit_document(user, document):
+          # Only checks if user created it
+          return document.created_by == user.id
+      ```
+      
+      **Attack:**
+      1. Alice creates document in Org A
+      2. Alice transfers to Org B (or is removed from Org A)
+      3. Alice can still edit documents in Org A (she created them)
+      4. But she's no longer authorized for Org A!
+      
+      ## Vulnerability 3: Admin Privilege Confusion
+      
+      The developer implements:
+      ```python
+      def can_delete_document(user, document):
+          # Org admins can delete anything in org
+          if user.is_org_admin(document.organization_id):
+              return True
+          return document.created_by == user.id
+      ```
+      
+      **Attack:**
+      1. Document marked as "locked" by compliance team
+      2. Org admin (who shouldn't bypass compliance) deletes it
+      3. Authorization passes because admin check doesn't respect locks
+      4. Business rule violated because ownership model was too simple
+      
+      ## Vulnerability 4: Shared Resource Confusion
+      
+      The developer implements:
+      ```python
+      def can_view_project(user, project):
+          # Project is shared with specific users
+          return user.id in project.shared_with_user_ids
+      ```
+      
+      **Attack:**
+      1. Project shared with [Alice, Bob] in Org A
+      2. Charlie (Org A member) can't view project (correct)
+      3. Dave (Org B member) is accidentally added to shared list
+      4. Dave can view Org A's project despite wrong org!
+      5. Missing check: shared_with must also be org members
+    
+    preconditions:
+      - "Application has organization/team model"
+      - "Resources have multiple ownership dimensions"
+      - "Authorization checks are incomplete or conflated"
+    
+    attack_steps:
+      - step: 1
+        action: "Map the ownership model"
+        detail: "Identify user-org, org-resource, and user-resource relationships"
+      - step: 2
+        action: "Identify which checks are performed"
+        detail: "For each operation, which relationships are verified?"
+      - step: 3
+        action: "Find gaps in authorization logic"
+        detail: "Which relationships are assumed but not checked?"
+      - step: 4
+        action: "Exploit the gap"
+        detail: "Access resources via the unchecked relationship path"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "medium"
+      availability: "low"
+      scope: "Unauthorized access to resources within or across organizations"
+      business_impact: |
+        - Private data exposed to unauthorized org members
+        - Ex-employees retaining access to resources they created
+        - Admin actions bypassing business rules
+        - Cross-organization data leakage via sharing features
+  
+  # Mitigations
+  mitigations:
+    - id: "MIT-AUTHZ-005a"
+      name: "Explicit multi-dimensional authorization check"
+      description: |
+        Create an authorization function that explicitly checks all relevant
+        ownership dimensions for each operation. Make the policy explicit
+        and auditable.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "More complex authorization logic"
+        - "Must maintain as ownership model evolves"
+        - "May impact performance with multiple checks"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Multi-dimensional authorization check"
+          
+          vulnerable_code: |
+            # VULNERABLE: Only checks one dimension
+            # File: app/documents.py
+            
+            @documents_bp.route('/<doc_id>', methods=['GET'])
+            @login_required
+            def get_document(doc_id):
+                document = Document.query.get_or_404(doc_id)
+                
+                # Only checks organization - misses visibility and ownership
+                if document.organization_id != current_user.organization_id:
+                    abort(404)
+                
+                return jsonify(document.to_dict())
+            
+            @documents_bp.route('/<doc_id>', methods=['PUT'])
+            @login_required
+            def update_document(doc_id):
+                document = Document.query.get_or_404(doc_id)
+                
+                # Only checks creator - misses org membership
+                if document.created_by != current_user.id:
+                    abort(403)
+                
+                # User might no longer be in the org!
+                document.title = request.json.get('title')
+                db.session.commit()
+                return jsonify(document.to_dict())
+          
+          secure_code: |
+            # SECURE: Explicit multi-dimensional checks
+            # File: app/auth/document_policy.py
+            
+            class DocumentPolicy:
+                """
+                Authorization policy for documents.
+                Explicitly checks all ownership dimensions.
+                """
+                
+                def __init__(self, user, document):
+                    self.user = user
+                    self.document = document
+                
+                def _user_in_document_org(self):
+                    """Check: Is user a member of the document's organization?"""
+                    return self.document.organization_id == self.user.organization_id
+                
+                def _user_is_creator(self):
+                    """Check: Did this user create the document?"""
+                    return self.document.created_by == self.user.id
+                
+                def _user_is_org_admin(self):
+                    """Check: Is user an admin of the document's organization?"""
+                    return self.user.has_role('admin', self.document.organization_id)
+                
+                def _document_is_shared(self):
+                    """Check: Is document visible to all org members?"""
+                    return self.document.visibility == 'shared'
+                
+                def _user_in_share_list(self):
+                    """Check: Is user explicitly granted access?"""
+                    return self.user.id in (self.document.shared_with_ids or [])
+                
+                def can_view(self):
+                    """
+                    View policy:
+                    - Must be in document's org (tenant isolation) AND
+                    - Either: created it, or it's shared, or explicitly granted, or is admin
+                    """
+                    if not self._user_in_document_org():
+                        return False
+                    
+                    return (
+                        self._user_is_creator() or
+                        self._document_is_shared() or
+                        self._user_in_share_list() or
+                        self._user_is_org_admin()
+                    )
+                
+                def can_edit(self):
+                    """
+                    Edit policy:
+                    - Must be in document's org AND
+                    - Either: created it, or is admin
+                    """
+                    if not self._user_in_document_org():
+                        return False
+                    
+                    return self._user_is_creator() or self._user_is_org_admin()
+                
+                def can_delete(self):
+                    """
+                    Delete policy:
+                    - Must be in document's org AND
+                    - Either: created it (and not locked), or is admin
+                    """
+                    if not self._user_in_document_org():
+                        return False
+                    
+                    if self.document.is_locked:
+                        return False  # Even admins can't delete locked docs
+                    
+                    return self._user_is_creator() or self._user_is_org_admin()
+            
+            # File: app/documents.py
+            
+            @documents_bp.route('/<doc_id>', methods=['GET'])
+            @login_required
+            def get_document(doc_id):
+                document = Document.query.get_or_404(doc_id)
+                policy = DocumentPolicy(current_user, document)
+                
+                if not policy.can_view():
+                    abort(404)  # Don't reveal existence
+                
+                return jsonify(document.to_dict())
+            
+            @documents_bp.route('/<doc_id>', methods=['PUT'])
+            @login_required
+            def update_document(doc_id):
+                document = Document.query.get_or_404(doc_id)
+                policy = DocumentPolicy(current_user, document)
+                
+                if not policy.can_edit():
+                    abort(404)
+                
+                document.title = request.json.get('title')
+                db.session.commit()
+                return jsonify(document.to_dict())
+    
+    - id: "MIT-AUTHZ-005b"
+      name: "Separate authorization scopes"
+      description: |
+        Define distinct scopes for different access levels. Each scope
+        explicitly declares which ownership checks it requires.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Need to define scopes carefully upfront"
+        - "May need many scopes for complex models"
+        - "Scope explosion if not managed"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Scoped authorization queries"
+          
+          secure_code: |
+            # SECURE: Authorization scopes
+            # File: app/models/document.py
+            
+            class Document(db.Model):
+                # ... fields ...
+                
+                @classmethod
+                def visible_to_user(cls, user):
+                    """
+                    Scope: Documents this user can view.
+                    Includes: owned, shared with them, or org-visible.
+                    """
+                    from sqlalchemy import or_
+                    
+                    return cls.query.filter(
+                        cls.organization_id == user.organization_id,  # Must be in org
+                        or_(
+                            cls.created_by == user.id,                # Created by user
+                            cls.visibility == 'shared',               # Shared with org
+                            cls.shared_with_ids.contains([user.id])   # Explicitly shared
+                        )
+                    )
+                
+                @classmethod
+                def editable_by_user(cls, user):
+                    """
+                    Scope: Documents this user can edit.
+                    More restrictive than visible_to_user.
+                    """
+                    from sqlalchemy import or_
+                    
+                    # Admins can edit all org documents
+                    if user.has_role('admin', user.organization_id):
+                        return cls.query.filter(
+                            cls.organization_id == user.organization_id
+                        )
+                    
+                    # Regular users can only edit their own
+                    return cls.query.filter(
+                        cls.organization_id == user.organization_id,
+                        cls.created_by == user.id
+                    )
+                
+                @classmethod
+                def deletable_by_user(cls, user):
+                    """
+                    Scope: Documents this user can delete.
+                    Excludes locked documents even for admins.
+                    """
+                    base = cls.editable_by_user(user)
+                    return base.filter(cls.is_locked == False)
+            
+            # File: app/documents.py
+            
+            @documents_bp.route('/<doc_id>', methods=['GET'])
+            @login_required
+            def get_document(doc_id):
+                # Use the appropriate scope
+                document = Document.visible_to_user(current_user).filter_by(
+                    id=doc_id
+                ).first_or_404()
+                return jsonify(document.to_dict())
+            
+            @documents_bp.route('/<doc_id>', methods=['DELETE'])
+            @login_required
+            def delete_document(doc_id):
+                # Use the appropriate scope
+                document = Document.deletable_by_user(current_user).filter_by(
+                    id=doc_id
+                ).first_or_404()
+                
+                document.soft_delete()
+                db.session.commit()
+                return '', 204
+    
+    - id: "MIT-AUTHZ-005c"
+      name: "Ownership transfer validation"
+      description: |
+        When users leave organizations or resources are transferred,
+        validate that all ownership relationships are updated consistently.
+      effectiveness: "medium"
+      implementation_effort: "high"
+      tradeoffs:
+        - "Complex state management"
+        - "Need to handle partial failures"
+        - "May require background job for large datasets"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Ownership cleanup on user removal"
+          
+          secure_code: |
+            # SECURE: Clean up ownership when user leaves org
+            # File: app/services/membership.py
+            
+            def remove_user_from_organization(user_id, organization_id):
+                """
+                Remove user from organization and clean up ownership.
+                """
+                user = User.query.get(user_id)
+                
+                # 1. Remove membership
+                membership = Membership.query.filter_by(
+                    user_id=user_id,
+                    organization_id=organization_id
+                ).first()
+                
+                if membership:
+                    db.session.delete(membership)
+                
+                # 2. Handle resources created by this user
+                orphaned_docs = Document.query.filter_by(
+                    organization_id=organization_id,
+                    created_by=user_id
+                ).all()
+                
+                for doc in orphaned_docs:
+                    # Option A: Transfer to org admin
+                    admin = get_org_admin(organization_id)
+                    doc.created_by = admin.id
+                    
+                    # Option B: Mark as orphaned for review
+                    # doc.created_by = None
+                    # doc.needs_owner_review = True
+                
+                # 3. Remove from share lists
+                shared_docs = Document.query.filter(
+                    Document.organization_id == organization_id,
+                    Document.shared_with_ids.contains([user_id])
+                ).all()
+                
+                for doc in shared_docs:
+                    doc.shared_with_ids.remove(user_id)
+                
+                # 4. Audit log
+                AuditLog.record(
+                    action='user_removed_from_org',
+                    user_id=user_id,
+                    organization_id=organization_id,
+                    details={
+                        'documents_transferred': len(orphaned_docs),
+                        'shares_removed': len(shared_docs)
+                    }
+                )
+                
+                db.session.commit()
+  
+  # Security principles
+  security_principles:
+    - principle: "Explicit ownership modeling"
+      explanation: >
+        All ownership relationships should be explicitly modeled and 
+        documented. Don't assume that "user in org" implies anything 
+        about specific resource access.
+    
+    - principle: "Principle of least privilege per resource"
+      explanation: >
+        Even within an organization, users should only access resources 
+        they need. Organization membership is necessary but not sufficient 
+        for resource access.
+    
+    - principle: "Ownership consistency on state changes"
+      explanation: >
+        When users join/leave organizations or resources are transferred,
+        all ownership relationships must be updated atomically. Stale 
+        ownership references create authorization gaps.
+  
+  # Related patterns
+  related_patterns:
+    - id: "TMKB-AUTHZ-004"
+      relationship: "related"
+      description: "Tenant isolation is one dimension of ownership"
+    
+    - id: "TMKB-AUTHZ-002"
+      relationship: "related"
+      description: "List/detail must check consistent ownership dimensions"
+  
+  # Testing guidance
+  testing:
+    manual_verification:
+      - step: "Map ownership relationships"
+        check: "What are all the ways a user can 'own' or access a resource?"
+      - step: "Review authorization checks"
+        check: "Which relationships are checked for each operation?"
+      - step: "Test cross-user access within org"
+        check: "Can user A access user B's private resources in same org?"
+      - step: "Test ex-member access"
+        check: "After leaving org, can user still access resources they created?"
+    
+    automated_checks:
+      - type: "integration_test"
+        description: "Access private resource as different org member"
+        expectation: "Should be denied despite same organization"
+      - type: "integration_test"
+        description: "Access resource after leaving organization"
+        expectation: "Should be denied even if user created it"
+      - type: "integration_test"
+        description: "Share resource with user from different org"
+        expectation: "Should be denied or share should fail"
+  
+  # Validation
+  validation:
+    baseline_test:
+      prompt: "Create a Flask API for document management with organizations and private/shared documents"
+      expected_failure: "LLM checks org membership but not document visibility settings"
+      observed: "Common: org check passes, but private document exposed to all org members"
+      date: "2025-02-04"

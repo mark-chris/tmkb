@@ -1,0 +1,109 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-006"
+  name: "Mass Assignment of Ownership Fields"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "input-handling"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "high"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-915"
+        name: "Improperly Controlled Modification of Dynamically-Determined Object Attributes"
+        url: "https://cwe.mitre.org/data/definitions/915.html"
+  
+  triggers:
+    keywords:
+      - "mass assignment"
+      - "request.json"
+      - "request.get_json"
+      - "**kwargs"
+      - "update"
+      - "patch"
+      - "from_dict"
+      - "load"
+      - "schema"
+    actions:
+      - "creating update endpoint"
+      - "implementing PATCH"
+      - "deserializing request body"
+    file_patterns:
+      - "**/routes/**"
+      - "**/api/**"
+      - "**/schemas/**"
+  
+  differentiation:
+    llm_blindspots:
+      - "Uses **request.json to update model without filtering fields"
+      - "Allows client to set organization_id, created_by, or role fields"
+      - "Doesn't distinguish between user-settable and system-managed fields"
+  
+  description: |
+    When update endpoints accept a JSON body and apply it directly to a model,
+    attackers can modify fields they shouldn't control—including ownership
+    fields (organization_id, user_id), role fields, or status fields that
+    affect authorization decisions.
+  
+  agent_summary:
+    threat: "Update endpoints accept ownership/role fields in request body, allowing privilege escalation"
+    check: "Verify update endpoints whitelist allowed fields; never accept organization_id, role, or created_by from client"
+    fix: "Explicitly whitelist updatable fields; reject or ignore protected fields"
+  
+  attack_scenario:
+    narrative: |
+      1. API has PATCH /users/{id} endpoint for profile updates
+      2. Endpoint does: `user.update(**request.json)`
+      3. Attacker sends: `{"name": "Attacker", "role": "admin", "organization_id": 2}`
+      4. User becomes admin and/or transfers to different organization
+    
+    preconditions:
+      - "Update endpoint accepts JSON body"
+      - "Fields applied to model without filtering"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "high"
+      availability: "low"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-006"
+      description: "Whitelist allowed fields for updates"
+      effectiveness: "high"
+      implementation_effort: "low"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Field whitelist for updates"
+          
+          secure_code: |
+            # SECURE: Explicit field whitelist
+            ALLOWED_UPDATE_FIELDS = {'name', 'email', 'bio', 'avatar_url'}
+            PROTECTED_FIELDS = {'id', 'organization_id', 'role', 'created_at', 'password_hash'}
+            
+            @users_bp.route('/<user_id>', methods=['PATCH'])
+            @login_required
+            def update_user(user_id):
+                user = get_authorized_user(user_id)
+                data = request.get_json()
+                
+                # Only update allowed fields
+                for field in ALLOWED_UPDATE_FIELDS:
+                    if field in data:
+                        setattr(user, field, data[field])
+                
+                db.session.commit()
+                return jsonify(user.to_dict())
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-005"
+      relationship: "related"
+      description: "Ownership fields are prime targets for mass assignment"

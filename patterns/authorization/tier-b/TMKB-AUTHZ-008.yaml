@@ -1,0 +1,121 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-008"
+  name: "Authorization Bypass via HTTP Method Override"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "request-handling"
+  language: "python"
+  framework: "flask"
+  
+  severity: "medium"
+  likelihood: "medium"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-650"
+        name: "Trusting HTTP Permission Methods on the Server Side"
+        url: "https://cwe.mitre.org/data/definitions/650.html"
+  
+  triggers:
+    keywords:
+      - "method override"
+      - "X-HTTP-Method-Override"
+      - "_method"
+      - "HTTP method"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "PATCH"
+    actions:
+      - "implementing REST API"
+      - "adding method override support"
+      - "configuring middleware"
+    file_patterns:
+      - "**/middleware/**"
+      - "**/app.py"
+      - "**/__init__.py"
+  
+  differentiation:
+    llm_blindspots:
+      - "Adds method override middleware without considering authorization implications"
+      - "Authorization decorators check original method, not overridden method"
+      - "Rate limiting applied to POST but bypassed via override to DELETE"
+  
+  description: |
+    Some frameworks support HTTP method override via headers (X-HTTP-Method-Override)
+    or query parameters (_method). If authorization or rate limiting is based on
+    the original HTTP method, attackers can bypass controls by sending a POST
+    request with an override header to execute DELETE operations.
+    
+    This is especially dangerous when:
+    - GET requests are cached/logged differently than mutations
+    - Authorization decorators check request.method before override
+    - Rate limits are method-specific
+  
+  agent_summary:
+    threat: "HTTP method override allows bypassing method-based authorization or rate limits"
+    check: "If using method override, verify authorization checks the effective method, not original"
+    fix: "Apply method override before authorization checks; or disable method override entirely"
+  
+  attack_scenario:
+    narrative: |
+      1. DELETE /resources/{id} requires admin role
+      2. POST /resources/{id} only requires authenticated user
+      3. Framework has method override enabled
+      4. Attacker sends: POST /resources/123 with header X-HTTP-Method-Override: DELETE
+      5. Authorization checks POST (allowed), but handler executes DELETE
+      6. Non-admin user deletes resource
+    
+    preconditions:
+      - "Method override is enabled"
+      - "Authorization is method-specific"
+      - "Override applied after authorization check"
+    
+    impact:
+      confidentiality: "medium"
+      integrity: "high"
+      availability: "medium"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-008"
+      description: "Disable method override or apply it before authorization"
+      effectiveness: "high"
+      implementation_effort: "low"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Safe method override handling"
+          
+          secure_code: |
+            # Option 1: Disable method override entirely (recommended)
+            # Simply don't add method override middleware
+            
+            # Option 2: If override needed, apply BEFORE auth middleware
+            # File: app/__init__.py
+            
+            @app.before_request
+            def handle_method_override():
+                """Apply method override early, before any authorization."""
+                if request.method == 'POST':
+                    override = (
+                        request.headers.get('X-HTTP-Method-Override') or
+                        request.form.get('_method') or
+                        request.args.get('_method')
+                    )
+                    if override:
+                        override = override.upper()
+                        if override in ('PUT', 'PATCH', 'DELETE'):
+                            request.environ['REQUEST_METHOD'] = override
+            
+            # Now authorization decorators see the effective method
+            # @require_admin checks against DELETE, not POST
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-006"
+      relationship: "related"
+      description: "Both involve trusting client-controlled request attributes"

@@ -1,0 +1,119 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-007"
+  name: "Insecure Direct Object Reference via Sequential IDs"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "object-references"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "high"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-639"
+        name: "Authorization Bypass Through User-Controlled Key"
+        url: "https://cwe.mitre.org/data/definitions/639.html"
+      - owasp: "API1:2023"
+        name: "Broken Object Level Authorization"
+        url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+  
+  triggers:
+    keywords:
+      - "id"
+      - "resource_id"
+      - "object_id"
+      - "integer"
+      - "autoincrement"
+      - "primary key"
+      - "sequential"
+      - "get_or_404"
+      - "query.get"
+    actions:
+      - "creating detail endpoint"
+      - "implementing get by ID"
+      - "fetching resource"
+    file_patterns:
+      - "**/routes/**"
+      - "**/api/**"
+      - "**/views/**"
+  
+  differentiation:
+    llm_blindspots:
+      - "Uses Model.query.get(id) without authorization check"
+      - "Assumes URL parameter is trusted because user is authenticated"
+      - "Doesn't verify ownership after fetching by ID"
+      - "Returns 403 instead of 404, revealing resource existence"
+  
+  description: |
+    Endpoints that fetch resources by ID often fail to verify that the
+    authenticated user is authorized to access that specific resource.
+    Sequential integer IDs make enumeration trivial. Even UUIDs don't
+    prevent IDOR if authorization is missing—they just slow enumeration.
+    
+    The fix is not obscuring IDs; it's checking authorization.
+  
+  agent_summary:
+    threat: "Endpoints fetch resources by ID without verifying the requester is authorized to access that specific resource"
+    check: "Verify every get-by-ID operation includes ownership/authorization check"
+    fix: "Always filter by ownership when fetching; return 404 (not 403) for unauthorized"
+  
+  attack_scenario:
+    narrative: |
+      1. User A creates Invoice #1001 in Organization A
+      2. User B (Organization B) is authenticated
+      3. User B requests GET /invoices/1001
+      4. Server does: `Invoice.query.get_or_404(1001)` — no org check
+      5. User B receives User A's invoice data
+      
+      With sequential IDs, attacker iterates 1000, 1001, 1002... to harvest data.
+    
+    preconditions:
+      - "Endpoint accepts resource ID from URL/query"
+      - "Resource fetched without authorization filter"
+      - "Attacker can guess or enumerate IDs"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "low"
+      availability: "low"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-007"
+      description: "Always include authorization in resource fetch"
+      effectiveness: "high"
+      implementation_effort: "low"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Authorized resource fetch"
+          
+          secure_code: |
+            # SECURE: Authorization in query, not after
+            @invoices_bp.route('/<invoice_id>', methods=['GET'])
+            @login_required
+            def get_invoice(invoice_id):
+                # Filter by ID AND organization in same query
+                invoice = Invoice.query.filter_by(
+                    id=invoice_id,
+                    organization_id=current_user.organization_id
+                ).first()
+                
+                if invoice is None:
+                    abort(404)  # Don't reveal existence with 403
+                
+                return jsonify(invoice.to_dict())
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-004"
+      relationship: "extends"
+      description: "IDOR is often a symptom of missing tenant isolation"
+    - id: "TMKB-AUTHZ-002"
+      relationship: "related"
+      description: "List/detail inconsistency is a form of IDOR"

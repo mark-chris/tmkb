@@ -1,0 +1,578 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-004"
+  name: "Tenant Isolation via Application Logic"
+  tier: "A"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  # Scope tags
+  category: "authorization"
+  subcategory: "multi-tenancy"
+  language: "python"
+  framework: "flask"
+  
+  severity: "critical"
+  likelihood: "high"
+  
+  # Generalization
+  generalizes_to:
+    - "Django multi-tenant applications"
+    - "FastAPI with tenant context"
+    - "Rails with acts_as_tenant"
+    - "Node.js multi-tenant APIs"
+    - "Any SaaS application with shared database"
+    - "Microservices with tenant context propagation"
+  
+  # Provenance
+  provenance:
+    source_type: "generalized_observation"
+    description: >
+      Multi-tenant applications commonly rely on application-level WHERE clauses
+      to isolate tenant data. This pattern is fragile—missing a single filter
+      results in cross-tenant data exposure. This is consistently one of the
+      highest-severity vulnerability classes in SaaS applications.
+    public_references:
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - cwe: "CWE-284"
+        name: "Improper Access Control"
+        url: "https://cwe.mitre.org/data/definitions/284.html"
+      - owasp: "API1:2023"
+        name: "Broken Object Level Authorization"
+        url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+  
+  # Triggers
+  triggers:
+    keywords:
+      - "multi-tenant"
+      - "tenant"
+      - "organization"
+      - "organization_id"
+      - "tenant_id"
+      - "company_id"
+      - "account_id"
+      - "workspace"
+      - "team_id"
+      - "saas"
+      - "shared database"
+    actions:
+      - "implementing multi-tenant API"
+      - "adding tenant isolation"
+      - "creating organization-scoped endpoint"
+      - "building SaaS application"
+      - "adding workspace support"
+    file_patterns:
+      - "**/models/**"
+      - "**/routes/**"
+      - "**/api/**"
+      - "**/*_model.py"
+      - "**/*_routes.py"
+  
+  # Differentiation
+  differentiation:
+    llm_knowledge_state: >
+      LLMs understand multi-tenancy conceptually and will add organization_id
+      or tenant_id fields to models. They often add tenant filters to some
+      queries, especially list endpoints. They know the term "tenant isolation."
+    tmkb_value: >
+      TMKB emphasizes that EVERY query must include tenant isolation—not just
+      obvious ones. The risk is not that LLMs don't know about tenant isolation;
+      it's that they inconsistently apply it, especially in edge cases like
+      joins, aggregations, background jobs, and error handling paths.
+    llm_blindspots:
+      - "Adds tenant filter to main query but not to related object lookups"
+      - "Filters in list but not in get-by-id"
+      - "Misses tenant filter in JOIN conditions"
+      - "Forgets tenant context in aggregation queries"
+      - "Doesn't propagate tenant context to background jobs"
+      - "Skips tenant filter in search/filter endpoints"
+      - "Exposes tenant IDs in error messages or URLs"
+  
+  # Description
+  description: |
+    Multi-tenant applications using a shared database must include tenant
+    filtering in **every single database query** that touches tenant-scoped data.
+    Missing even one filter results in cross-tenant data exposure.
+    
+    **Why application-level isolation is fragile:**
+    
+    1. **Inconsistent application**: Developers must remember to add 
+       `WHERE tenant_id = ?` to every query. New endpoints, refactors, and
+       edge cases frequently miss this.
+    
+    2. **ORM abstraction leakage**: Queries using `get_or_404()`, 
+       `first_or_404()`, or `get()` bypass custom query methods that 
+       include tenant filters.
+    
+    3. **Related object access**: Fetching related objects (foreign keys,
+       joins) may not inherit tenant context from the parent query.
+    
+    4. **Async context loss**: Background jobs and async operations lose
+       the request context that carries tenant information.
+    
+    5. **Admin/debug endpoints**: Internal tools often skip tenant filters
+       for convenience, then accidentally get exposed.
+    
+    **The consequence of a single miss:** Complete tenant data breach.
+    Unlike other authorization bugs that might expose one record, a missing
+    tenant filter exposes ALL records from ALL tenants.
+    
+    **Architectural alternatives:**
+    - Row-level security (PostgreSQL RLS)
+    - Separate databases per tenant
+    - Separate schemas per tenant
+    
+    These provide defense-in-depth but are often not used due to complexity.
+  
+  # Agent summary (<100 tokens)
+  agent_summary:
+    threat: "Missing tenant_id filter in ANY query exposes all tenants' data; application-level isolation is fragile"
+    check: "Verify EVERY query includes tenant filter, including joins, lookups, and background jobs"
+    fix: "Use base query class with automatic tenant filter; never use Model.query.get() directly"
+  
+  # Attack scenario
+  attack_scenario:
+    narrative: |
+      ## Setup
+      A project management SaaS has:
+      - Organizations (tenants) with separate data
+      - Users belong to organizations
+      - Projects, tasks, and comments are scoped to organizations
+      - All data in shared PostgreSQL database
+      
+      ## The Vulnerability
+      Most endpoints correctly filter by organization:
+      ```python
+      # List projects - correct
+      projects = Project.query.filter_by(
+          organization_id=current_user.organization_id
+      ).all()
+      ```
+      
+      But one endpoint was added quickly and missed the filter:
+      ```python
+      # Get project comments - WRONG
+      @projects_bp.route('/<project_id>/comments', methods=['GET'])
+      @login_required
+      def get_comments(project_id):
+          # Checks project ownership...
+          project = Project.query.filter_by(
+              id=project_id,
+              organization_id=current_user.organization_id
+          ).first_or_404()
+          
+          # But fetches ALL comments for project, regardless of tenant!
+          # (In a bug where project_id was confused with comment thread_id)
+          comments = Comment.query.filter_by(project_id=project_id).all()
+          return jsonify([c.to_dict() for c in comments])
+      ```
+      
+      Actually, a more subtle bug:
+      ```python
+      # Search across projects - WRONG
+      @projects_bp.route('/search', methods=['GET'])
+      @login_required
+      def search_projects():
+          query = request.args.get('q')
+          # Forgot tenant filter in search!
+          projects = Project.query.filter(
+              Project.name.ilike(f'%{query}%')
+          ).all()
+          return jsonify([p.to_dict() for p in projects])
+      ```
+      
+      ## Attack Path 1: Direct Query Exploitation
+      1. Attacker uses Organization A credentials
+      2. Attacker calls `/projects/search?q=confidential`
+      3. Search returns matching projects from ALL organizations
+      4. Attacker discovers Organization B's confidential project names
+      
+      ## Attack Path 2: ID Enumeration
+      1. Attacker notes their project IDs are sequential (1001, 1002...)
+      2. Attacker guesses project ID 500 belongs to another organization
+      3. If any endpoint misses tenant filter, attacker accesses project 500
+      
+      ## Attack Path 3: Relationship Traversal
+      1. Attacker has legitimate access to Project A (their org)
+      2. Project A has a foreign key comment_thread_id
+      3. Endpoint that fetches comments by thread_id doesn't check tenant
+      4. Attacker manipulates request to fetch comments from other tenants
+    
+    preconditions:
+      - "Multi-tenant application with shared database"
+      - "Tenant isolation via application-level WHERE clauses"
+      - "At least one query missing tenant filter"
+    
+    attack_steps:
+      - step: 1
+        action: "Map application endpoints and queries"
+        detail: "Identify all data access patterns"
+      - step: 2
+        action: "Test each endpoint for tenant isolation"
+        detail: "Use two test accounts in different tenants"
+      - step: 3
+        action: "Check ID-based lookups"
+        detail: "Can tenant A access tenant B's resources by ID?"
+      - step: 4
+        action: "Test search, filter, and aggregation endpoints"
+        detail: "These commonly miss tenant filters"
+      - step: 5
+        action: "Check error messages and debug output"
+        detail: "May leak tenant IDs or cross-tenant data"
+    
+    impact:
+      confidentiality: "critical"
+      integrity: "high"
+      availability: "low"
+      scope: "Complete cross-tenant data breach"
+      business_impact: |
+        - Full exposure of all customers' data
+        - Regulatory violations (GDPR, HIPAA, SOC 2)
+        - Loss of customer trust, potential business failure
+        - Legal liability for data breach
+        - Unlike single-record IDOR, this exposes EVERYTHING
+  
+  # Mitigations
+  mitigations:
+    - id: "MIT-AUTHZ-004a"
+      name: "Automatic tenant-scoped base query"
+      description: |
+        Create a base query class or method that automatically includes 
+        tenant filtering. All application code must use this instead of
+        direct model queries. Make it impossible to accidentally query
+        without tenant context.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Requires discipline to always use scoped queries"
+        - "Need escape hatch for legitimate cross-tenant operations"
+        - "Must integrate with all query patterns (joins, subqueries)"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-sqlalchemy"
+          description: "Automatic tenant-scoped queries"
+          
+          vulnerable_code: |
+            # VULNERABLE: Manual tenant filter easily forgotten
+            # File: app/projects.py
+            
+            @projects_bp.route('', methods=['GET'])
+            @login_required
+            def list_projects():
+                # Developer remembered here...
+                projects = Project.query.filter_by(
+                    organization_id=current_user.organization_id
+                ).all()
+                return jsonify([p.to_dict() for p in projects])
+            
+            @projects_bp.route('/search', methods=['GET'])
+            @login_required
+            def search_projects():
+                query = request.args.get('q')
+                # ...but forgot here!
+                projects = Project.query.filter(
+                    Project.name.ilike(f'%{query}%')
+                ).all()
+                return jsonify([p.to_dict() for p in projects])
+          
+          secure_code: |
+            # SECURE: Automatic tenant scoping
+            # File: app/models/base.py
+            
+            from flask_login import current_user
+            from flask import has_request_context
+            
+            class TenantScopedMixin:
+                """
+                Mixin that provides automatic tenant-scoped queries.
+                """
+                organization_id = db.Column(
+                    db.Integer, 
+                    db.ForeignKey('organizations.id'),
+                    nullable=False,
+                    index=True
+                )
+                
+                @classmethod
+                def tenant_query(cls):
+                    """
+                    Returns a query automatically filtered to current tenant.
+                    Raises error if no tenant context available.
+                    """
+                    if not has_request_context():
+                        raise RuntimeError(
+                            f"Cannot query {cls.__name__} without request context. "
+                            "Use explicit tenant_id for background jobs."
+                        )
+                    
+                    if not current_user or not current_user.is_authenticated:
+                        raise RuntimeError(
+                            f"Cannot query {cls.__name__} without authenticated user"
+                        )
+                    
+                    return cls.query.filter_by(
+                        organization_id=current_user.organization_id
+                    )
+                
+                @classmethod
+                def get_for_tenant(cls, id, tenant_id=None):
+                    """
+                    Get by ID with tenant verification.
+                    Use tenant_id param for background jobs.
+                    """
+                    if tenant_id is None:
+                        query = cls.tenant_query()
+                    else:
+                        query = cls.query.filter_by(organization_id=tenant_id)
+                    
+                    return query.filter_by(id=id).first_or_404()
+            
+            # File: app/models/project.py
+            
+            class Project(db.Model, TenantScopedMixin):
+                __tablename__ = 'projects'
+                id = db.Column(db.Integer, primary_key=True)
+                name = db.Column(db.String(255), nullable=False)
+                # organization_id inherited from mixin
+            
+            # File: app/projects.py
+            
+            @projects_bp.route('', methods=['GET'])
+            @login_required
+            def list_projects():
+                # Tenant filter is automatic
+                projects = Project.tenant_query().all()
+                return jsonify([p.to_dict() for p in projects])
+            
+            @projects_bp.route('/search', methods=['GET'])
+            @login_required
+            def search_projects():
+                query = request.args.get('q')
+                # Tenant filter is still automatic!
+                projects = Project.tenant_query().filter(
+                    Project.name.ilike(f'%{query}%')
+                ).all()
+                return jsonify([p.to_dict() for p in projects])
+            
+            @projects_bp.route('/<int:project_id>', methods=['GET'])
+            @login_required
+            def get_project(project_id):
+                # Automatic tenant verification
+                project = Project.get_for_tenant(project_id)
+                return jsonify(project.to_dict())
+    
+    - id: "MIT-AUTHZ-004b"
+      name: "Database-level row security (PostgreSQL RLS)"
+      description: |
+        Use PostgreSQL Row-Level Security to enforce tenant isolation at the
+        database level. Even if application code misses a filter, the database
+        prevents cross-tenant access.
+      effectiveness: "very high"
+      implementation_effort: "high"
+      tradeoffs:
+        - "PostgreSQL-specific feature"
+        - "Requires careful session/connection management"
+        - "Performance considerations for complex policies"
+        - "Need to set tenant context on each connection"
+      
+      code_examples:
+        - language: "sql"
+          framework: "postgresql"
+          description: "Row-Level Security policy"
+          
+          secure_code: |
+            -- SECURE: Database-enforced tenant isolation
+            -- File: migrations/add_rls.sql
+            
+            -- Enable RLS on tenant-scoped tables
+            ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+            
+            -- Create policy that filters by current tenant
+            -- Tenant ID is set via session variable
+            CREATE POLICY tenant_isolation_policy ON projects
+                USING (organization_id = current_setting('app.current_tenant_id')::integer);
+            
+            CREATE POLICY tenant_isolation_policy ON tasks
+                USING (organization_id = current_setting('app.current_tenant_id')::integer);
+            
+            CREATE POLICY tenant_isolation_policy ON comments
+                USING (organization_id = current_setting('app.current_tenant_id')::integer);
+            
+            -- Application must set tenant context on each request
+            -- SET app.current_tenant_id = '123';
+        - language: "python"
+          framework: "flask-sqlalchemy"
+          description: "Setting RLS context in Flask"
+          
+          secure_code: |
+            # SECURE: Set tenant context for RLS
+            # File: app/__init__.py
+            
+            from flask import g
+            from flask_login import current_user
+            
+            @app.before_request
+            def set_tenant_context():
+                """Set PostgreSQL session variable for RLS."""
+                if current_user and current_user.is_authenticated:
+                    tenant_id = current_user.organization_id
+                    db.session.execute(
+                        text("SET app.current_tenant_id = :tenant_id"),
+                        {"tenant_id": tenant_id}
+                    )
+                    g.current_tenant_id = tenant_id
+            
+            # Now even if application code forgets WHERE clause,
+            # PostgreSQL RLS prevents cross-tenant access
+    
+    - id: "MIT-AUTHZ-004c"
+      name: "Tenant context middleware with validation"
+      description: |
+        Create middleware that extracts and validates tenant context early
+        in the request lifecycle, storing it in request-local storage.
+        All database operations reference this validated context.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Adds middleware overhead"
+        - "Must handle requests without tenant context (login, public endpoints)"
+        - "Need to propagate context to background jobs explicitly"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "Tenant context middleware"
+          
+          secure_code: |
+            # SECURE: Tenant context middleware
+            # File: app/middleware/tenant.py
+            
+            from flask import g, request
+            from functools import wraps
+            
+            class TenantContext:
+                """Holds validated tenant information for the request."""
+                def __init__(self, tenant_id, tenant_name):
+                    self.tenant_id = tenant_id
+                    self.tenant_name = tenant_name
+                
+                def __repr__(self):
+                    return f"<TenantContext {self.tenant_name} ({self.tenant_id})>"
+            
+            def get_current_tenant():
+                """Get current tenant context. Raises if not set."""
+                ctx = getattr(g, 'tenant_context', None)
+                if ctx is None:
+                    raise RuntimeError("No tenant context available")
+                return ctx
+            
+            def require_tenant(f):
+                """Decorator that ensures tenant context is available."""
+                @wraps(f)
+                def decorated(*args, **kwargs):
+                    get_current_tenant()  # Raises if not set
+                    return f(*args, **kwargs)
+                return decorated
+            
+            # File: app/__init__.py
+            
+            @app.before_request
+            def load_tenant_context():
+                """Load and validate tenant context from authenticated user."""
+                g.tenant_context = None
+                
+                if current_user and current_user.is_authenticated:
+                    org = Organization.query.get(current_user.organization_id)
+                    if org:
+                        g.tenant_context = TenantContext(
+                            tenant_id=org.id,
+                            tenant_name=org.name
+                        )
+            
+            # File: app/models/base.py
+            
+            class TenantScopedModel(db.Model):
+                __abstract__ = True
+                
+                organization_id = db.Column(db.Integer, nullable=False, index=True)
+                
+                @classmethod
+                def for_current_tenant(cls):
+                    """Query scoped to current tenant context."""
+                    ctx = get_current_tenant()
+                    return cls.query.filter_by(organization_id=ctx.tenant_id)
+  
+  # Security principles
+  security_principles:
+    - principle: "Defense in depth for tenant isolation"
+      explanation: >
+        Application-level WHERE clauses should not be the only tenant 
+        isolation mechanism. Combine with database RLS, separate schemas,
+        or at minimum, a base query class that makes isolation automatic.
+    
+    - principle: "Fail secure on missing context"
+      explanation: >
+        If tenant context is not available (missing session, background job
+        without context), the query should fail rather than return unfiltered
+        results. Make isolation failures loud and obvious.
+    
+    - principle: "Tenant context is request-scoped state"
+      explanation: >
+        Tenant information should be validated once at request start and
+        stored in request-local storage. All code references this validated
+        context rather than re-extracting from user sessions.
+    
+    - principle: "Cross-tenant operations require explicit override"
+      explanation: >
+        Legitimate cross-tenant operations (admin tools, migrations, reports)
+        should require explicit opt-out of tenant filtering, making it obvious
+        in code review that tenant boundaries are being crossed.
+  
+  # Related patterns
+  related_patterns:
+    - id: "TMKB-AUTHZ-001"
+      relationship: "extends"
+      description: "Background jobs must explicitly receive and use tenant context"
+    
+    - id: "TMKB-AUTHZ-002"
+      relationship: "related"
+      description: "List/detail consistency includes consistent tenant filtering"
+    
+    - id: "TMKB-AUTHZ-005"
+      relationship: "related"
+      description: "Organization membership vs resource ownership"
+  
+  # Testing guidance
+  testing:
+    manual_verification:
+      - step: "Inventory all database queries"
+        check: "Does every query touching tenant-scoped data include tenant filter?"
+      - step: "Check ID-based lookups"
+        check: "Are get_or_404() and similar methods wrapped with tenant check?"
+      - step: "Review search and aggregation endpoints"
+        check: "Commonly missed for tenant filtering"
+      - step: "Check background job queries"
+        check: "Is tenant context explicitly passed and used?"
+    
+    automated_checks:
+      - type: "integration_test"
+        description: "Two-tenant access test"
+        expectation: "Tenant A cannot see any of Tenant B's resources via any endpoint"
+      - type: "static_analysis"
+        description: "Find direct Model.query usage"
+        pattern: "Model\\.query\\.(get|filter|all)(?!.*organization_id)"
+      - type: "integration_test"
+        description: "Search endpoint tenant isolation"
+        expectation: "Search results only include current tenant's data"
+  
+  # Validation
+  validation:
+    baseline_test:
+      prompt: "Create a Flask API for a multi-tenant project management app"
+      expected_failure: "LLM adds tenant filter to most queries but misses edge cases"
+      observed: "Common misses: search endpoints, get_or_404 usage, related object fetches"
+      date: "2025-02-04"

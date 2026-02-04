@@ -1,0 +1,550 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-001"
+  name: "Background Job Authorization Context Loss"
+  tier: "A"
+  version: "1.0.0"
+  last_updated: "2025-02-03"
+  
+  # Scope tags
+  category: "authorization"
+  subcategory: "async-boundaries"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "high"
+  
+  # Generalization - shows this isn't Flask-specific
+  generalizes_to:
+    - "Django + Celery"
+    - "FastAPI + background tasks"
+    - "FastAPI + ARQ"
+    - "Node.js + Bull/BullMQ"
+    - "Node.js + agenda"
+    - "Ruby on Rails + Sidekiq"
+    - "Ruby on Rails + ActiveJob"
+    - "Go + Temporal"
+    - "Go + Asynq"
+    - "Java Spring + @Async"
+    - "Any framework with async job processing"
+  
+  # Provenance
+  provenance:
+    source_type: "generalized_observation"
+    description: >
+      Common pattern in queue-based architectures. Authorization is validated 
+      at the HTTP boundary but not re-validated when jobs execute. This pattern
+      appears in multiple public incidents and is consistently reproduced in 
+      AI-generated code that handles async processing.
+    public_references:
+      - cwe: "CWE-862"
+        name: "Missing Authorization"
+        url: "https://cwe.mitre.org/data/definitions/862.html"
+      - cwe: "CWE-863"
+        name: "Incorrect Authorization"
+        url: "https://cwe.mitre.org/data/definitions/863.html"
+      - owasp: "API1:2023"
+        name: "Broken Object Level Authorization"
+        url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+  
+  # Triggers - when should an agent query this pattern?
+  triggers:
+    keywords:
+      - "celery"
+      - "rq"
+      - "redis queue"
+      - "background job"
+      - "background task"
+      - "task queue"
+      - "async task"
+      - "worker"
+      - "job queue"
+      - "delayed job"
+      - "process later"
+      - "enqueue"
+    actions:
+      - "creating background job"
+      - "implementing task queue"
+      - "processing async task"
+      - "adding celery task"
+      - "queuing work"
+      - "deferring processing"
+    file_patterns:
+      - "**/tasks.py"
+      - "**/tasks/**"
+      - "**/workers/**"
+      - "**/jobs/**"
+      - "**/*_task.py"
+      - "**/*_worker.py"
+      - "**/celery.py"
+      - "**/celery_*.py"
+  
+  # Why this matters beyond LLM knowledge
+  differentiation:
+    llm_knowledge_state: >
+      LLMs understand that authorization is important and consistently add 
+      @login_required or equivalent decorators to HTTP endpoints. They know 
+      about RBAC, ownership checks, and tenant isolation at the API layer.
+    tmkb_value: >
+      TMKB flags that async execution contexts lose authorization state. 
+      The boundary between "HTTP request with user session" and "background 
+      worker process" is a trust boundary that requires re-authorization.
+    llm_blindspots:
+      - "Generates authorization check in endpoint, but not in background job"
+      - "Passes only object ID to job, losing user/tenant context entirely"
+      - "Assumes the endpoint check is sufficient for the entire operation"
+      - "Doesn't recognize that workers run in a different security context"
+      - "Treats job parameters as trusted because they came from 'our code'"
+  
+  # The threat - concise description
+  description: |
+    When a web endpoint enqueues a background job, the authorization context 
+    (current user, permissions, tenant ID) is often lost. The endpoint validates 
+    that the requesting user can access a resource, then passes only the resource 
+    ID to the background job. The job executes in a separate process without any 
+    user session, and processes the resource without re-validating authorization.
+    
+    This creates two attack surfaces:
+    
+    1. **Direct queue injection**: If an attacker can enqueue jobs directly 
+       (via Redis exposure, SSRF, or insider access), they can process any 
+       resource by ID without authorization checks.
+    
+    2. **Time-of-check to time-of-use (TOCTOU)**: Authorization may change 
+       between when the endpoint checks and when the job executes. User 
+       permissions could be revoked, resources could be transferred to 
+       different tenants, or soft-deleted resources could be targeted.
+    
+    The fundamental issue: authorization was checked at the wrong boundary.
+    The job trusts parameters that should be verified.
+  
+  # Agent-facing summary - must be <100 tokens
+  agent_summary:
+    threat: "Background jobs execute without the authorization context from the original request"
+    check: "Verify authorization is re-checked in the job, not just the endpoint"
+    fix: "Pass user_id and tenant_id to job; re-validate permissions before operating on resources"
+  
+  # Detailed attack scenario
+  attack_scenario:
+    narrative: |
+      ## Setup
+      A multi-tenant file processing API allows users to upload files. Files 
+      belong to organizations (tenants). The upload endpoint:
+      1. Validates the user is authenticated
+      2. Associates the file with the user's organization
+      3. Enqueues a background job to process the file: `process_file.delay(file_id)`
+      
+      ## The Vulnerability
+      The background job receives only `file_id`. It loads the file from the 
+      database and processes it without checking:
+      - Does the file still belong to a valid organization?
+      - Does the original user still have access?
+      - Has the file been marked as deleted?
+      
+      ## Attack Path 1: Direct Queue Access
+      An attacker with access to the Redis instance (misconfiguration, SSRF, 
+      compromised internal service) can directly enqueue:
+      ```
+      process_file.delay("victim-organization-file-id")
+      ```
+      The worker processes any file ID without question.
+      
+      ## Attack Path 2: Race Condition / TOCTOU
+      1. Attacker uploads file to their organization (Org A)
+      2. File passes authorization check, job is enqueued
+      3. Before job executes, attacker (or admin) transfers file to Org B
+      4. Job processes file that now belongs to different tenant
+      5. Processing results (metadata, derivatives) leak to wrong context
+      
+      ## Attack Path 3: Soft-Delete Bypass
+      1. User uploads file, job enqueued
+      2. Admin soft-deletes the file (sets deleted_at timestamp)
+      3. Job executes, loads file by ID (doesn't check deleted_at)
+      4. Deleted file is processed, potentially resurrected or leaked
+    
+    preconditions:
+      - "Application uses background job processing (Celery, RQ, etc.)"
+      - "Authorization is checked only at the HTTP endpoint"
+      - "Job receives resource identifiers without authorization context"
+      - "Worker process has database access to load resources by ID"
+    
+    attack_steps:
+      - step: 1
+        action: "Identify endpoints that trigger background jobs"
+        detail: "Look for immediate responses with 'processing' or 'pending' status"
+      - step: 2
+        action: "Determine what identifiers are passed to jobs"
+        detail: "Review task signatures, typically just resource IDs"
+      - step: 3
+        action: "Attempt direct job injection or timing attacks"
+        detail: "If queue is accessible, inject jobs with target resource IDs"
+      - step: 4
+        action: "Observe unauthorized operations"
+        detail: "Check if resources from other tenants were processed"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "high"
+      availability: "low"
+      scope: "Cross-tenant data access, unauthorized resource processing"
+      business_impact: |
+        - Tenant data isolation breach (compliance/legal exposure)
+        - Processing of resources user no longer has access to
+        - Potential data exfiltration via processing side-effects
+        - Audit log shows legitimate-looking job execution
+  
+  # Mitigations - multiple approaches with tradeoffs
+  mitigations:
+    - id: "MIT-AUTHZ-001a"
+      name: "Re-check authorization in background job"
+      description: |
+        Pass the user ID and tenant ID to the background job. Before processing 
+        any resource, re-validate that the user still exists, still belongs to 
+        the tenant, and still has permission to access the resource.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Adds database queries to every job execution"
+        - "Must handle case where user/tenant no longer exists"
+        - "Authorization logic duplicated between endpoint and job"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-celery"
+          description: "Authorization re-check in Celery task"
+          
+          vulnerable_code: |
+            # VULNERABLE: No authorization check in task
+            # File: app/tasks.py
+            
+            @celery.task(bind=True, max_retries=3)
+            def process_file(self, file_id):
+                """Process uploaded file - INSECURE"""
+                with flask_app.app_context():
+                    # Loads any file by ID - no authorization!
+                    file_record = File.query.get(file_id)
+                    if not file_record:
+                        return {'status': 'error', 'message': 'File not found'}
+                    
+                    # Process file without checking who requested it
+                    # or whether they still have access
+                    file_record.status = 'processing'
+                    db.session.commit()
+                    
+                    # ... extract metadata, move file, etc.
+                    
+                    file_record.status = 'completed'
+                    db.session.commit()
+          
+          secure_code: |
+            # SECURE: Re-validate authorization in task
+            # File: app/tasks.py
+            
+            class AuthorizationError(Exception):
+                """Raised when job authorization fails"""
+                pass
+            
+            @celery.task(bind=True, max_retries=3)
+            def process_file(self, file_id, user_id, organization_id):
+                """Process uploaded file with authorization re-check"""
+                with flask_app.app_context():
+                    # Load file record
+                    file_record = File.query.get(file_id)
+                    if not file_record:
+                        logger.warning(f"File {file_id} not found")
+                        return {'status': 'error', 'message': 'File not found'}
+                    
+                    # RE-VALIDATE AUTHORIZATION
+                    # Check 1: File belongs to the claimed organization
+                    if file_record.organization_id != organization_id:
+                        logger.error(
+                            f"Tenant mismatch: file {file_id} belongs to org "
+                            f"{file_record.organization_id}, job claimed org {organization_id}"
+                        )
+                        raise AuthorizationError("Tenant mismatch in background job")
+                    
+                    # Check 2: User still exists and belongs to the organization
+                    user = User.query.get(user_id)
+                    if not user:
+                        logger.error(f"User {user_id} no longer exists")
+                        raise AuthorizationError("Requesting user no longer exists")
+                    
+                    if user.organization_id != organization_id:
+                        logger.error(
+                            f"User {user_id} no longer in org {organization_id}"
+                        )
+                        raise AuthorizationError("User organization changed")
+                    
+                    # Check 3: File not soft-deleted (if applicable)
+                    if hasattr(file_record, 'deleted_at') and file_record.deleted_at:
+                        logger.warning(f"Attempted to process deleted file {file_id}")
+                        raise AuthorizationError("File has been deleted")
+                    
+                    # Authorization passed - safe to process
+                    file_record.status = 'processing'
+                    db.session.commit()
+                    
+                    # ... extract metadata, move file, etc.
+                    
+                    file_record.status = 'completed'
+                    db.session.commit()
+                    
+                    return {'status': 'success', 'file_id': file_id}
+            
+            # Updated endpoint to pass authorization context
+            # File: app/files.py
+            
+            @files_bp.route('', methods=['POST'])
+            @login_required
+            def upload_file():
+                # ... file upload logic ...
+                
+                # Queue with authorization context
+                task = process_file.delay(
+                    file_id=file_record.id,
+                    user_id=current_user.id,
+                    organization_id=current_user.organization_id
+                )
+                
+                # ... rest of endpoint ...
+    
+    - id: "MIT-AUTHZ-001b"
+      name: "Sign job payloads to prevent tampering"
+      description: |
+        Cryptographically sign the job payload (user_id, resource_id, tenant_id, 
+        timestamp) when enqueuing. Verify the signature before processing. This 
+        prevents direct queue injection attacks but doesn't solve TOCTOU issues.
+      effectiveness: "medium"
+      implementation_effort: "high"
+      tradeoffs:
+        - "Prevents injection but not authorization changes over time"
+        - "Requires secret key management"
+        - "Signature verification adds latency"
+        - "Should be combined with MIT-AUTHZ-001a for full protection"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-celery"
+          description: "HMAC-signed job payload"
+          
+          secure_code: |
+            # SECURE: Signed job payloads prevent injection
+            # File: app/tasks.py
+            
+            import hmac
+            import hashlib
+            import time
+            
+            class JobSignatureError(Exception):
+                """Raised when job signature is invalid"""
+                pass
+            
+            def sign_job_payload(user_id, resource_id, organization_id):
+                """Create HMAC signature for job payload"""
+                timestamp = int(time.time())
+                payload = f"{user_id}:{resource_id}:{organization_id}:{timestamp}"
+                signature = hmac.new(
+                    current_app.config['JOB_SIGNING_KEY'].encode(),
+                    payload.encode(),
+                    hashlib.sha256
+                ).hexdigest()
+                return signature, timestamp
+            
+            def verify_job_signature(user_id, resource_id, organization_id, 
+                                     timestamp, signature, max_age=3600):
+                """Verify HMAC signature and check timestamp"""
+                # Check timestamp is recent (prevent replay)
+                if time.time() - timestamp > max_age:
+                    raise JobSignatureError("Job signature expired")
+                
+                payload = f"{user_id}:{resource_id}:{organization_id}:{timestamp}"
+                expected = hmac.new(
+                    current_app.config['JOB_SIGNING_KEY'].encode(),
+                    payload.encode(),
+                    hashlib.sha256
+                ).hexdigest()
+                
+                if not hmac.compare_digest(signature, expected):
+                    raise JobSignatureError("Invalid job signature")
+                
+                return True
+            
+            @celery.task(bind=True, max_retries=3)
+            def process_file(self, file_id, user_id, organization_id, 
+                            timestamp, signature):
+                """Process file with signature verification"""
+                with flask_app.app_context():
+                    # Verify signature FIRST
+                    try:
+                        verify_job_signature(
+                            user_id, file_id, organization_id,
+                            timestamp, signature
+                        )
+                    except JobSignatureError as e:
+                        logger.error(f"Job signature failed for file {file_id}: {e}")
+                        return {'status': 'error', 'message': 'Invalid job signature'}
+                    
+                    # Signature valid - also re-check authorization (defense in depth)
+                    file_record = File.query.get(file_id)
+                    if file_record.organization_id != organization_id:
+                        raise AuthorizationError("Tenant mismatch")
+                    
+                    # ... process file ...
+            
+            # Endpoint enqueues with signature
+            # File: app/files.py
+            
+            @files_bp.route('', methods=['POST'])
+            @login_required
+            def upload_file():
+                # ... file upload logic ...
+                
+                # Sign the job payload
+                signature, timestamp = sign_job_payload(
+                    current_user.id,
+                    file_record.id,
+                    current_user.organization_id
+                )
+                
+                # Queue with signature
+                task = process_file.delay(
+                    file_id=file_record.id,
+                    user_id=current_user.id,
+                    organization_id=current_user.organization_id,
+                    timestamp=timestamp,
+                    signature=signature
+                )
+    
+    - id: "MIT-AUTHZ-001c"
+      name: "Centralized job authorization middleware"
+      description: |
+        Create a decorator or base task class that automatically handles 
+        authorization context extraction and validation. Reduces the chance 
+        of developers forgetting to add checks to individual tasks.
+      effectiveness: "high"
+      implementation_effort: "medium"
+      tradeoffs:
+        - "Requires consistent adoption across all tasks"
+        - "May not fit all task signatures"
+        - "Need to handle tasks that legitimately don't need user context"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask-celery"
+          description: "Base task class with authorization"
+          
+          secure_code: |
+            # SECURE: Base task class enforces authorization
+            # File: app/tasks/base.py
+            
+            from celery import Task
+            from functools import wraps
+            
+            class AuthorizedTask(Task):
+                """Base task that requires authorization context"""
+                
+                # Subclasses must accept these parameters
+                required_auth_params = ['user_id', 'organization_id']
+                
+                def __call__(self, *args, **kwargs):
+                    # Validate required auth params are present
+                    for param in self.required_auth_params:
+                        if param not in kwargs:
+                            raise ValueError(
+                                f"AuthorizedTask requires '{param}' parameter"
+                            )
+                    
+                    # Validate authorization before running task
+                    with flask_app.app_context():
+                        user_id = kwargs['user_id']
+                        org_id = kwargs['organization_id']
+                        
+                        user = User.query.get(user_id)
+                        if not user or user.organization_id != org_id:
+                            raise AuthorizationError(
+                                f"Invalid authorization context: "
+                                f"user={user_id}, org={org_id}"
+                            )
+                        
+                        # Store validated context for task to use
+                        self.authorized_user = user
+                        self.authorized_org_id = org_id
+                    
+                    return super().__call__(*args, **kwargs)
+            
+            # Usage - task automatically gets authorization validation
+            # File: app/tasks/files.py
+            
+            @celery.task(bind=True, base=AuthorizedTask, max_retries=3)
+            def process_file(self, file_id, user_id, organization_id):
+                """Process file - authorization already validated by base class"""
+                with flask_app.app_context():
+                    file_record = File.query.get(file_id)
+                    
+                    # Still verify resource belongs to authorized tenant
+                    if file_record.organization_id != self.authorized_org_id:
+                        raise AuthorizationError("Resource tenant mismatch")
+                    
+                    # Safe to process
+                    # ...
+  
+  # Security principles this pattern illustrates
+  security_principles:
+    - principle: "Authorization at point of action"
+      explanation: >
+        Authorization must be checked where the action happens, not just 
+        where the request enters the system. Background jobs are a different 
+        execution context with different trust properties.
+    
+    - principle: "Async boundaries are trust boundaries"
+      explanation: >
+        When data crosses from a synchronous HTTP context to an async worker, 
+        it crosses a trust boundary. The worker cannot assume the HTTP layer's 
+        authorization check is sufficient.
+    
+    - principle: "Never trust parameters across process boundaries"
+      explanation: >
+        Job parameters are data. Data can be tampered with, replayed, or 
+        injected. Re-validate authorization using the parameters, don't just 
+        trust that they came from legitimate code.
+    
+    - principle: "Defense in depth"
+      explanation: >
+        Combine multiple mitigations: re-check authorization AND sign payloads 
+        AND use a base task class. Each layer catches different attack vectors.
+  
+  # Related patterns
+  related_patterns:
+    - id: "TMKB-AUTHZ-004"
+      relationship: "extends"
+      description: "Tenant isolation in async jobs - specific multi-tenant concerns"
+    
+    - id: "TMKB-AUTHZ-003"
+      relationship: "related"
+      description: "Soft-delete resurrection - jobs may process 'deleted' resources"
+  
+  # Testing guidance
+  testing:
+    manual_verification:
+      - step: "Review Celery/RQ task signatures"
+        check: "Do tasks receive user_id and organization_id, or just resource IDs?"
+      - step: "Search for authorization checks in tasks"
+        check: "grep for User.query, organization_id comparisons in task files"
+      - step: "Trace from endpoint to task"
+        check: "What context is passed in .delay() or .apply_async() calls?"
+    
+    automated_checks:
+      - type: "static_analysis"
+        description: "Flag tasks that accept resource IDs without auth context"
+        pattern: "@celery.task.*def.*\\(self,.*_id\\):"
+      - type: "integration_test"
+        description: "Call task directly with cross-tenant resource ID"
+        expectation: "Should raise AuthorizationError, not process resource"
+  
+  # Real-world validation
+  validation:
+    baseline_test:
+      prompt: "Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"
+      expected_failure: "LLM generates endpoint auth but task accepts only file_id"
+      observed: "Confirmed - Claude Code generated process_file(self, file_id) with no auth checks"
+      date: "2025-02-03"

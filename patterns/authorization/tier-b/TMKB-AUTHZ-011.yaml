@@ -1,0 +1,132 @@
+threat_pattern:
+  id: "TMKB-AUTHZ-011"
+  name: "Authorization Check in Wrong Layer"
+  tier: "B"
+  version: "1.0.0"
+  last_updated: "2025-02-04"
+  
+  category: "authorization"
+  subcategory: "architecture"
+  language: "python"
+  framework: "flask"
+  
+  severity: "high"
+  likelihood: "medium"
+  
+  provenance:
+    source_type: "generalized_observation"
+    public_references:
+      - cwe: "CWE-862"
+        name: "Missing Authorization"
+        url: "https://cwe.mitre.org/data/definitions/862.html"
+  
+  triggers:
+    keywords:
+      - "frontend"
+      - "client"
+      - "UI"
+      - "hidden"
+      - "disabled"
+      - "visibility"
+      - "display:none"
+      - "v-if"
+      - "ng-if"
+      - "conditional render"
+      - "service layer"
+      - "controller"
+    actions:
+      - "implementing permissions UI"
+      - "hiding features based on role"
+      - "conditional rendering"
+      - "adding feature flags"
+    file_patterns:
+      - "**/templates/**"
+      - "**/static/**"
+      - "**/components/**"
+      - "**/*.jsx"
+      - "**/*.vue"
+  
+  differentiation:
+    llm_blindspots:
+      - "Generates UI that hides buttons/links for unauthorized actions but API allows them"
+      - "Relies on frontend routing guards without backend verification"
+      - "Assumes hiding a form field prevents it from being submitted"
+      - "Places authorization logic in service layer that can be bypassed by direct API calls"
+  
+  description: |
+    Authorization must be enforced at the point where the action is executed
+    (typically the API endpoint), not where the user interface is rendered.
+    Common mistakes:
+    
+    - Hiding admin buttons in UI but not protecting admin API endpoints
+    - Using frontend route guards without backend authorization
+    - Checking permissions in service layer but allowing direct controller access
+    - Disabling form fields but still accepting those fields in request body
+    
+    Attackers bypass the UI entirely and call APIs directly.
+  
+  agent_summary:
+    threat: "Authorization enforced in UI/frontend but not in API, allowing bypass via direct API calls"
+    check: "Verify every API endpoint enforces authorization server-side, regardless of UI restrictions"
+    fix: "Authorization at API layer is mandatory; UI restrictions are convenience, not security"
+  
+  attack_scenario:
+    narrative: |
+      1. Admin panel shows "Delete User" button only to admins (UI check)
+      2. Frontend code: `{user.isAdmin && <DeleteButton />}`
+      3. API endpoint DELETE /admin/users/{id} has no authorization check
+      4. Attacker (non-admin) calls API directly: `curl -X DELETE /admin/users/123`
+      5. User deleted despite not being admin
+      
+      The UI provided security theater, not actual security.
+    
+    preconditions:
+      - "UI hides or disables features based on permissions"
+      - "API endpoints don't independently verify authorization"
+    
+    impact:
+      confidentiality: "high"
+      integrity: "high"
+      availability: "high"
+  
+  mitigations:
+    - id: "MIT-AUTHZ-011"
+      description: "Enforce authorization at API layer, treat UI as convenience"
+      effectiveness: "high"
+      implementation_effort: "low"
+      
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "API-layer authorization enforcement"
+          
+          secure_code: |
+            # SECURE: Authorization at API layer (required)
+            # UI hiding is additional, not replacement
+            
+            def require_admin(f):
+                """Decorator that enforces admin role at API layer."""
+                @wraps(f)
+                def decorated(*args, **kwargs):
+                    if not current_user.is_authenticated:
+                        abort(401)
+                    if not current_user.has_role('admin'):
+                        abort(403)  # Or 404 to hide existence
+                    return f(*args, **kwargs)
+                return decorated
+            
+            @admin_bp.route('/users/<user_id>', methods=['DELETE'])
+            @require_admin  # API-layer enforcement - cannot be bypassed
+            def delete_user(user_id):
+                user = User.query.get_or_404(user_id)
+                db.session.delete(user)
+                db.session.commit()
+                return '', 204
+            
+            # Frontend can ALSO hide the button (better UX), but
+            # security comes from the @require_admin decorator
+  
+  related_patterns:
+    - id: "TMKB-AUTHZ-001"
+      relationship: "related"
+      description: "Background jobs are another example of action happening outside request layer"

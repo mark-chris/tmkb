@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  BINARY_NAME: tmkb
+  BUILD_DIR: bin
+  VERSION: 0.1.0
+  GIT_COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+  BUILD_DATE:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+
+tasks:
+  default:
+    desc: Build the CLI
+    cmds:
+      - task: build
+
+  setup:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  build:
+    desc: Build the CLI binary
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go build -ldflags "-X github.com/mark-chris/tmkb/internal/cli.Version={{.VERSION}} -X github.com/mark-chris/tmkb/internal/cli.GitCommit={{.GIT_COMMIT}} -X github.com/mark-chris/tmkb/internal/cli.BuildDate={{.BUILD_DATE}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/tmkb
+    sources:
+      - "**/*.go"
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v ./...
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+
+  validate:
+    desc: Validate all patterns
+    deps: [build]
+    cmds:
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} validate --all
+
+  query:
+    desc: Run example query
+    deps: [build]
+    cmds:
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} query --context "background job processing" --verbose
+
+  install:
+    desc: Install binary to GOPATH/bin
+    deps: [build]
+    cmds:
+      - cp {{.BUILD_DIR}}/{{.BINARY_NAME}} $(go env GOPATH)/bin/
