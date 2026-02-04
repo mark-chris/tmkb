@@ -3,6 +3,7 @@
 > A security context source that agents, tools, and humans can consume—starting with threat patterns for authorization enforcement in multi-tenant applications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Project](https://img.shields.io/badge/Project-TMKB%20MVP-blue)](https://github.com/users/mark-chris/projects/2)
 
 ## What This Project Demonstrates
 
