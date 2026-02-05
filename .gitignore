@@ -52,3 +52,4 @@ flask_session/
 
 # Project-specific exclusions
 tmkb-mvp-tasks.md
+docs/security-settings-review.md

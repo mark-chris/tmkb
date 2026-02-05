@@ -61,6 +61,11 @@ func (l *Loader) LoadAll() ([]ThreatPattern, error) {
 
 // LoadFile loads a single pattern from a YAML file
 func (l *Loader) LoadFile(path string) (ThreatPattern, error) {
+	// Validate path to prevent directory traversal attacks
+	if err := l.validatePath(path); err != nil {
+		return ThreatPattern{}, err
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ThreatPattern{}, fmt.Errorf("failed to read file: %w", err)
@@ -105,4 +110,32 @@ func (l *Loader) LoadByCategory(category string) ([]ThreatPattern, error) {
 	}
 
 	return filtered, nil
+}
+
+// validatePath ensures the given path is within the loader's basePath
+// and prevents directory traversal attacks
+func (l *Loader) validatePath(path string) error {
+	// Clean and resolve the paths to absolute form
+	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	cleanBase, err := filepath.Abs(filepath.Clean(l.basePath))
+	if err != nil {
+		return fmt.Errorf("failed to resolve base path: %w", err)
+	}
+
+	// Check if the clean path is within the base path
+	relPath, err := filepath.Rel(cleanBase, cleanPath)
+	if err != nil {
+		return fmt.Errorf("failed to compute relative path: %w", err)
+	}
+
+	// If the relative path starts with "..", it's outside the base path
+	if strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+		return fmt.Errorf("path traversal detected: %s is outside base path %s", path, l.basePath)
+	}
+
+	return nil
 }
