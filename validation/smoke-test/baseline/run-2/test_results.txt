@@ -1,0 +1,85 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.3, pluggy-1.6.0 -- /home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/mark/Projects/test2-flask-api/.worktrees/implementation
+configfile: pytest.ini
+plugins: flask-1.3.0, cov-4.1.0
+collecting ... collected 33 items
+
+tests/test_auth.py::TestRegister::test_register_new_user_new_organization PASSED [  3%]
+tests/test_auth.py::TestRegister::test_register_new_user_existing_organization PASSED [  6%]
+tests/test_auth.py::TestRegister::test_register_duplicate_email FAILED   [  9%]
+tests/test_auth.py::TestRegister::test_register_missing_fields PASSED    [ 12%]
+tests/test_auth.py::TestRegister::test_register_invalid_email PASSED     [ 15%]
+tests/test_auth.py::TestLogin::test_login_success FAILED                 [ 18%]
+tests/test_auth.py::TestLogin::test_login_wrong_password PASSED          [ 21%]
+tests/test_auth.py::TestLogin::test_login_nonexistent_user PASSED        [ 24%]
+tests/test_auth.py::TestLogin::test_login_inactive_user FAILED           [ 27%]
+tests/test_auth.py::TestLogin::test_login_missing_fields PASSED          [ 30%]
+tests/test_auth.py::TestLogout::test_logout_success FAILED               [ 33%]
+tests/test_auth.py::TestLogout::test_logout_not_authenticated FAILED     [ 36%]
+tests/test_auth.py::TestAuthenticationRequired::test_files_endpoint_requires_auth FAILED [ 39%]
+tests/test_auth.py::TestAuthenticationRequired::test_file_upload_requires_auth FAILED [ 42%]
+tests/test_auth.py::TestAuthenticationRequired::test_authenticated_request_includes_user PASSED [ 45%]
+tests/test_files.py::TestFileUpload::test_upload_file_success FAILED     [ 48%]
+tests/test_files.py::TestFileUpload::test_upload_file_no_file_provided PASSED [ 51%]
+tests/test_files.py::TestFileUpload::test_upload_file_empty_filename PASSED [ 54%]
+tests/test_files.py::TestFileUpload::test_upload_file_exceeds_quota FAILED [ 57%]
+tests/test_files.py::TestFileUpload::test_upload_requires_authentication FAILED [ 60%]
+tests/test_files.py::TestFileList::test_list_files_empty PASSED          [ 63%]
+tests/test_files.py::TestFileList::test_list_files_with_files FAILED     [ 66%]
+tests/test_files.py::TestFileList::test_list_files_pagination FAILED     [ 69%]
+tests/test_files.py::TestFileList::test_list_files_tenant_isolation FAILED [ 72%]
+tests/test_files.py::TestFileDetails::test_get_file_details_success FAILED [ 75%]
+tests/test_files.py::TestFileDetails::test_get_file_details_not_found PASSED [ 78%]
+tests/test_files.py::TestFileDetails::test_get_file_details_tenant_isolation FAILED [ 81%]
+tests/test_files.py::TestFileDownload::test_download_file_success FAILED [ 84%]
+tests/test_files.py::TestFileDownload::test_download_file_pending_status FAILED [ 87%]
+tests/test_files.py::TestFileDownload::test_download_file_failed_status FAILED [ 90%]
+tests/test_files.py::TestFileDownload::test_download_file_not_found PASSED [ 93%]
+tests/test_files.py::TestFileDownload::test_download_file_tenant_isolation FAILED [ 96%]
+tests/test_files.py::TestFileProcessing::test_file_validation_task_execution FAILED [100%]
+
+=================================== FAILURES ===================================
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:65: AssertionError: assert 'already exists' in 'email already registered'
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:120: AttributeError: 'FlaskClient' object has no attribute 'cookie_jar'
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:158: assert 403 == 401
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:191: assert 302 == 401
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:198: assert 302 in [200, 401]
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:207: assert 302 == 401
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_auth.py:212: assert 302 == 401
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_files.py:89: assert 413 == 400
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/tests/test_files.py:106: assert 302 == 401
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+/home/mark/Projects/test2-flask-api/.worktrees/implementation/venv/lib/python3.12/site-packages/kombu/connection.py:478: kombu.exceptions.OperationalError: Error 111 connecting to localhost:6379. Connection refused.
+=========================== short test summary info ============================
+FAILED tests/test_auth.py::TestRegister::test_register_duplicate_email - Asse...
+FAILED tests/test_auth.py::TestLogin::test_login_success - AttributeError: 'F...
+FAILED tests/test_auth.py::TestLogin::test_login_inactive_user - assert 403 =...
+FAILED tests/test_auth.py::TestLogout::test_logout_success - assert 302 == 401
+FAILED tests/test_auth.py::TestLogout::test_logout_not_authenticated - assert...
+FAILED tests/test_auth.py::TestAuthenticationRequired::test_files_endpoint_requires_auth
+FAILED tests/test_auth.py::TestAuthenticationRequired::test_file_upload_requires_auth
+FAILED tests/test_files.py::TestFileUpload::test_upload_file_success - kombu....
+FAILED tests/test_files.py::TestFileUpload::test_upload_file_exceeds_quota - ...
+FAILED tests/test_files.py::TestFileUpload::test_upload_requires_authentication
+FAILED tests/test_files.py::TestFileList::test_list_files_with_files - kombu....
+FAILED tests/test_files.py::TestFileList::test_list_files_pagination - kombu....
+FAILED tests/test_files.py::TestFileList::test_list_files_tenant_isolation - ...
+FAILED tests/test_files.py::TestFileDetails::test_get_file_details_success - ...
+FAILED tests/test_files.py::TestFileDetails::test_get_file_details_tenant_isolation
+FAILED tests/test_files.py::TestFileDownload::test_download_file_success - ko...
+FAILED tests/test_files.py::TestFileDownload::test_download_file_pending_status
+FAILED tests/test_files.py::TestFileDownload::test_download_file_failed_status
+FAILED tests/test_files.py::TestFileDownload::test_download_file_tenant_isolation
+FAILED tests/test_files.py::TestFileProcessing::test_file_validation_task_execution
+================== 20 failed, 13 passed in 219.87s (0:03:39) ===================

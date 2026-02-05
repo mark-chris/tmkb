@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+*.db
+*.sqlite
+*.sqlite3
+.git
+.gitignore
+instance/
+uploads/
+flask_session/
