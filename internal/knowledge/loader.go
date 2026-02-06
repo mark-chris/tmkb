@@ -66,6 +66,7 @@ func (l *Loader) LoadFile(path string) (ThreatPattern, error) {
 		return ThreatPattern{}, err
 	}
 
+	// #nosec G304 -- Path is validated by validatePath() above to prevent directory traversal
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ThreatPattern{}, fmt.Errorf("failed to read file: %w", err)
