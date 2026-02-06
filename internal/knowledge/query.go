@@ -17,9 +17,13 @@ type QueryOptions struct {
 
 // QueryResult holds the results of a query
 type QueryResult struct {
-	PatternCount int              `json:"pattern_count"`
-	Patterns     []PatternOutput  `json:"patterns"`
-	CodePattern  *CodePatternOutput `json:"code_pattern,omitempty"`
+	PatternCount      int                     `json:"pattern_count"`
+	PatternsIncluded  int                     `json:"patterns_included"`
+	TokenCount        int                     `json:"token_count,omitempty"`
+	TokenLimitReached bool                    `json:"token_limit_reached,omitempty"`
+	Patterns          []PatternOutput         `json:"patterns,omitempty"`
+	VerbosePatterns   []PatternOutputVerbose  `json:"verbose_patterns,omitempty"`
+	CodePattern       *CodePatternOutput      `json:"code_pattern,omitempty"`
 }
 
 // PatternOutput is the agent-facing summary of a pattern
@@ -34,19 +38,47 @@ type PatternOutput struct {
 
 // PatternOutputVerbose is the human-facing detailed output
 type PatternOutputVerbose struct {
-	PatternOutput
-	Description      string           `json:"description"`
-	AttackNarrative  string           `json:"attack_narrative,omitempty"`
-	Mitigations      []MitigationBrief `json:"mitigations"`
-	RelatedPatterns  []string         `json:"related_patterns,omitempty"`
-	CWEReferences    []string         `json:"cwe_references,omitempty"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Severity          string                `json:"severity"`
+	Likelihood        string                `json:"likelihood"`
+	Threat            string                `json:"threat"`
+	Check             string                `json:"check"`
+	Fix               string                `json:"fix"`
+	Description       string                `json:"description"`
+	AttackScenario    *AttackScenarioOutput `json:"attack_scenario,omitempty"`
+	Mitigations       []MitigationVerbose   `json:"mitigations"`
+	RelatedPatterns   []string              `json:"related_patterns,omitempty"`
+	CWEReferences     []string              `json:"cwe_references,omitempty"`
+	OWASPReferences   []string              `json:"owasp_references,omitempty"`
 }
 
-// MitigationBrief is a summary of a mitigation
-type MitigationBrief struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Effectiveness string `json:"effectiveness"`
+// AttackScenarioOutput provides full attack scenario details
+type AttackScenarioOutput struct {
+	Narrative     string       `json:"narrative"`
+	Preconditions []string     `json:"preconditions"`
+	Steps         []AttackStep `json:"steps"`
+	Impact        Impact       `json:"impact"`
+}
+
+// MitigationVerbose provides detailed mitigation information
+type MitigationVerbose struct {
+	ID                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	Description          string               `json:"description"`
+	Effectiveness        string               `json:"effectiveness"`
+	ImplementationEffort string               `json:"implementation_effort"`
+	Tradeoffs            []string             `json:"tradeoffs,omitempty"`
+	CodeExamples         []CodeExampleVerbose `json:"code_examples,omitempty"`
+}
+
+// CodeExampleVerbose shows both vulnerable and secure code
+type CodeExampleVerbose struct {
+	Language       string `json:"language"`
+	Framework      string `json:"framework"`
+	Description    string `json:"description"`
+	VulnerableCode string `json:"vulnerable_code,omitempty"`
+	SecureCode     string `json:"secure_code,omitempty"`
 }
 
 // CodePatternOutput provides a code template for the most relevant pattern
@@ -119,50 +151,20 @@ func Query(idx *Index, opts QueryOptions) QueryResult {
 		sortBySeverity(candidates)
 	}
 
-	// Apply limit (default to 3 for agent output)
-	limit := opts.Limit
-	if limit <= 0 {
-		if opts.Verbosity == "human" {
+	// Build response based on verbosity
+	if opts.Verbosity == "human" {
+		limit := opts.Limit
+		if limit <= 0 {
 			limit = 10
-		} else {
+		}
+		return buildVerboseResponse(candidates, limit)
+	} else {
+		limit := opts.Limit
+		if limit <= 0 {
 			limit = 3
 		}
+		return buildAgentResponse(candidates, limit)
 	}
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
-
-	// Build output
-	result := QueryResult{
-		PatternCount: len(candidates),
-		Patterns:     make([]PatternOutput, 0, len(candidates)),
-	}
-
-	for _, p := range candidates {
-		output := PatternOutput{
-			ID:       p.ID,
-			Severity: p.Severity,
-			Threat:   p.AgentSummary.Threat,
-			Check:    p.AgentSummary.Check,
-			Fix:      p.AgentSummary.Fix,
-		}
-
-		if opts.Verbosity == "human" {
-			output.Name = p.Name
-		}
-
-		result.Patterns = append(result.Patterns, output)
-	}
-
-	// Add code pattern from most relevant match
-	if len(candidates) > 0 {
-		codePattern := extractCodePattern(candidates[0], opts.Language, opts.Framework)
-		if codePattern != nil {
-			result.CodePattern = codePattern
-		}
-	}
-
-	return result
 }
 
 // filterByLanguage filters patterns by programming language
