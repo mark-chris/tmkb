@@ -4,18 +4,49 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/mark-chris/tmkb/internal/knowledge"
 )
 
+// serverState represents the server lifecycle state
+type serverState int
+
+const (
+	stateNotInitialized serverState = iota
+	stateInitializing
+	stateInitialized
+)
+
 // Server implements the Model Context Protocol for TMKB
 type Server struct {
-	index *knowledge.Index
+	index              *knowledge.Index
+	state              serverState
+	protocolVersion    string
+	clientCapabilities map[string]interface{}
+	mu                 sync.RWMutex
 }
 
 // NewServer creates a new MCP server
 func NewServer(index *knowledge.Index) *Server {
-	return &Server{index: index}
+	return &Server{
+		index: index,
+		state: stateNotInitialized,
+	}
+}
+
+// setState sets the server state (thread-safe)
+func (s *Server) setState(state serverState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = state
+}
+
+// getState gets the server state (thread-safe)
+func (s *Server) getState() serverState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state
 }
 
 // ToolDefinition returns the MCP tool definition for tmkb_query
