@@ -91,7 +91,15 @@ func CreateTestPattern(id, name, language, framework string) knowledge.ThreatPat
 			Description:      "Test pattern for unit testing",
 			PublicReferences: []knowledge.PublicReference{},
 		},
-		Mitigations: []knowledge.Mitigation{},
+		Mitigations: []knowledge.Mitigation{
+			{
+				ID:                   "M1",
+				Name:                 "Test Mitigation",
+				Description:          "Test mitigation description",
+				Effectiveness:        "high",
+				ImplementationEffort: "medium",
+			},
+		},
 	}
 }
 
