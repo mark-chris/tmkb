@@ -50,8 +50,14 @@ The generated Celery task accepted only `file_id`—no user context, no tenant v
 # Build
 go build -o bin/tmkb ./cmd/tmkb
 
-# Query patterns by context
+# Query patterns by context (agent mode - default)
 ./bin/tmkb query --context "background job processing"
+
+# Query with verbose output (human-readable)
+./bin/tmkb query --context "background job processing" --verbose
+
+# Query with filters
+./bin/tmkb query --context "file upload" --language python --framework flask
 
 # Get a specific pattern
 ./bin/tmkb get TMKB-AUTHZ-001
@@ -68,6 +74,8 @@ go build -o bin/tmkb ./cmd/tmkb
 ```json
 {
   "pattern_count": 1,
+  "patterns_included": 1,
+  "token_count": 74,
   "patterns": [
     {
       "id": "TMKB-AUTHZ-001",
@@ -84,6 +92,12 @@ go build -o bin/tmkb ./cmd/tmkb
   }
 }
 ```
+
+**Output Modes:**
+- **Agent mode (default)**: Token-limited (<500 tokens), max 3 patterns, JSON only
+- **Verbose mode** (`--verbose`): Unlimited tokens, max 10 patterns, comprehensive details
+
+See [Query Response Format Documentation](docs/api/query-response-format.md) for complete API specification.
 
 ## Pattern Coverage (MVP)
 
