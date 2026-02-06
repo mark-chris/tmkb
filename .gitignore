@@ -50,6 +50,9 @@ flask_session/
 *.db
 *.sqlite
 
+# Git worktrees
+.worktrees/
+
 # Project-specific exclusions
 tmkb-mvp-tasks.md
 docs/security-settings-review.md

@@ -56,6 +56,12 @@ type CodePatternOutput struct {
 	SecureTemplate string `json:"secure_template"`
 }
 
+// patternWithScore holds a pattern and its relevance score
+type patternWithScore struct {
+	pattern *ThreatPattern
+	score   float64
+}
+
 // Query executes a query against the index
 func Query(idx *Index, opts QueryOptions) QueryResult {
 	var candidates []*ThreatPattern
@@ -86,8 +92,32 @@ func Query(idx *Index, opts QueryOptions) QueryResult {
 		candidates = filterByCategory(candidates, opts.Category)
 	}
 
-	// Sort by severity (critical > high > medium > low) then by likelihood
-	sortBySeverity(candidates)
+	// Sort by relevance if context provided, otherwise by severity
+	if opts.Context != "" && strings.TrimSpace(opts.Context) != "" {
+		// Extract keywords from context
+		queryKeywords := ExtractKeywords(opts.Context)
+
+		// Calculate relevance scores
+		scored := make([]patternWithScore, len(candidates))
+		for i, p := range candidates {
+			score := CalculateRelevance(queryKeywords, p.Triggers.Keywords)
+			scored[i] = patternWithScore{
+				pattern: p,
+				score:   score,
+			}
+		}
+
+		// Sort by relevance (highest first), then severity, then likelihood
+		sortByRelevance(scored)
+
+		// Extract sorted patterns
+		for i, s := range scored {
+			candidates[i] = s.pattern
+		}
+	} else {
+		// Sort by severity (critical > high > medium > low) then by likelihood
+		sortBySeverity(candidates)
+	}
 
 	// Apply limit (default to 3 for agent output)
 	limit := opts.Limit
@@ -169,6 +199,47 @@ func filterByCategory(patterns []*ThreatPattern, category string) []*ThreatPatte
 		}
 	}
 	return filtered
+}
+
+// sortByRelevance sorts patterns by relevance score (highest first),
+// with severity and likelihood as tiebreakers
+func sortByRelevance(scored []patternWithScore) {
+	severityOrder := map[string]int{
+		"critical": 0,
+		"high":     1,
+		"medium":   2,
+		"low":      3,
+	}
+
+	likelihoodOrder := map[string]int{
+		"high":   0,
+		"medium": 1,
+		"low":    2,
+	}
+
+	sort.Slice(scored, func(i, j int) bool {
+		// Primary: relevance score (higher is better)
+		if scored[i].score != scored[j].score {
+			return scored[i].score > scored[j].score
+		}
+
+		// Secondary: severity (critical > high > medium > low)
+		si := severityOrder[strings.ToLower(scored[i].pattern.Severity)]
+		sj := severityOrder[strings.ToLower(scored[j].pattern.Severity)]
+		if si != sj {
+			return si < sj
+		}
+
+		// Tertiary: likelihood (high > medium > low)
+		li := likelihoodOrder[strings.ToLower(scored[i].pattern.Likelihood)]
+		lj := likelihoodOrder[strings.ToLower(scored[j].pattern.Likelihood)]
+		if li != lj {
+			return li < lj
+		}
+
+		// Quaternary: alphabetical by ID
+		return scored[i].pattern.ID < scored[j].pattern.ID
+	})
 }
 
 // sortBySeverity sorts patterns by severity (critical > high > medium > low)
