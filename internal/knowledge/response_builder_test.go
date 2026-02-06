@@ -156,3 +156,200 @@ func TestBuildAgentResponse_TokenCounting(t *testing.T) {
 		t.Errorf("Token count %d seems too high for minimal pattern", result.TokenCount)
 	}
 }
+
+func TestBuildVerboseResponse_AllFields(t *testing.T) {
+	candidates := []*ThreatPattern{
+		{
+			ID:          "TMKB-001",
+			Name:        "Test Pattern",
+			Severity:    "critical",
+			Likelihood:  "high",
+			Description: "Full description here",
+			AgentSummary: AgentSummary{
+				Threat: "Threat text",
+				Check:  "Check text",
+				Fix:    "Fix text",
+			},
+			AttackScenario: &AttackScenario{
+				Narrative:     "Attack narrative",
+				Preconditions: []string{"precond1"},
+				AttackSteps: []AttackStep{
+					{Step: 1, Action: "Action", Detail: "Detail"},
+				},
+				Impact: Impact{
+					Confidentiality: "high",
+					Integrity:       "high",
+					Availability:    "low",
+					Scope:           "changed",
+				},
+			},
+			Mitigations: []Mitigation{
+				{
+					ID:                   "MIT-001",
+					Name:                 "Mitigation Name",
+					Description:          "Mitigation description",
+					Effectiveness:        "high",
+					ImplementationEffort: "medium",
+					Tradeoffs:            []string{"tradeoff1"},
+					CodeExamples: []CodeExample{
+						{
+							Language:       "python",
+							Framework:      "flask",
+							Description:    "Example",
+							VulnerableCode: "bad code",
+							SecureCode:     "good code",
+						},
+					},
+				},
+			},
+			RelatedPatterns: []RelatedPattern{
+				{ID: "TMKB-002", Relationship: "related", Description: "desc"},
+			},
+			Provenance: Provenance{
+				PublicReferences: []PublicReference{
+					{CWE: "CWE-285", Name: "Authorization", URL: "https://cwe.mitre.org/285"},
+					{OWASP: "A01:2021", Name: "Broken Access Control", URL: "https://owasp.org"},
+				},
+			},
+		},
+	}
+
+	result := buildVerboseResponse(candidates, 10)
+
+	if result.PatternCount != 1 {
+		t.Errorf("Expected pattern_count=1, got %d", result.PatternCount)
+	}
+
+	if result.PatternsIncluded != 1 {
+		t.Errorf("Expected patterns_included=1, got %d", result.PatternsIncluded)
+	}
+
+	if len(result.VerbosePatterns) != 1 {
+		t.Fatalf("Expected 1 verbose pattern, got %d", len(result.VerbosePatterns))
+	}
+
+	verbose := result.VerbosePatterns[0]
+
+	if verbose.ID != "TMKB-001" {
+		t.Errorf("Expected ID=TMKB-001, got %s", verbose.ID)
+	}
+
+	if verbose.Description == "" {
+		t.Error("Expected description to be populated")
+	}
+
+	if verbose.AttackScenario == nil {
+		t.Fatal("Expected attack scenario to be populated")
+	}
+
+	if verbose.AttackScenario.Narrative != "Attack narrative" {
+		t.Errorf("Expected narrative, got %s", verbose.AttackScenario.Narrative)
+	}
+
+	if len(verbose.Mitigations) != 1 {
+		t.Fatalf("Expected 1 mitigation, got %d", len(verbose.Mitigations))
+	}
+
+	if len(verbose.Mitigations[0].CodeExamples) != 1 {
+		t.Fatalf("Expected 1 code example, got %d", len(verbose.Mitigations[0].CodeExamples))
+	}
+
+	codeEx := verbose.Mitigations[0].CodeExamples[0]
+	if codeEx.VulnerableCode != "bad code" {
+		t.Errorf("Expected vulnerable code, got %s", codeEx.VulnerableCode)
+	}
+
+	if codeEx.SecureCode != "good code" {
+		t.Errorf("Expected secure code, got %s", codeEx.SecureCode)
+	}
+
+	if len(verbose.RelatedPatterns) != 1 {
+		t.Errorf("Expected 1 related pattern, got %d", len(verbose.RelatedPatterns))
+	}
+
+	if len(verbose.CWEReferences) != 1 {
+		t.Errorf("Expected 1 CWE reference, got %d", len(verbose.CWEReferences))
+	}
+
+	if len(verbose.OWASPReferences) != 1 {
+		t.Errorf("Expected 1 OWASP reference, got %d", len(verbose.OWASPReferences))
+	}
+}
+
+func TestBuildVerboseResponse_TierBPattern(t *testing.T) {
+	// Tier B pattern without attack scenario
+	candidates := []*ThreatPattern{
+		{
+			ID:          "TMKB-006",
+			Name:        "Tier B Pattern",
+			Severity:    "high",
+			Likelihood:  "medium",
+			Description: "Description",
+			AgentSummary: AgentSummary{
+				Threat: "Threat",
+				Check:  "Check",
+				Fix:    "Fix",
+			},
+			// No AttackScenario
+			Mitigations: []Mitigation{
+				{
+					ID:                   "MIT-001",
+					Name:                 "Mitigation",
+					Description:          "Details",
+					Effectiveness:        "high",
+					ImplementationEffort: "low",
+				},
+			},
+		},
+	}
+
+	result := buildVerboseResponse(candidates, 10)
+
+	if len(result.VerbosePatterns) != 1 {
+		t.Fatalf("Expected 1 pattern, got %d", len(result.VerbosePatterns))
+	}
+
+	verbose := result.VerbosePatterns[0]
+
+	// AttackScenario should be nil for Tier B
+	if verbose.AttackScenario != nil {
+		t.Error("Expected attack_scenario to be nil for Tier B pattern")
+	}
+
+	// Should still have mitigations
+	if len(verbose.Mitigations) != 1 {
+		t.Errorf("Expected 1 mitigation, got %d", len(verbose.Mitigations))
+	}
+}
+
+func TestBuildVerboseResponse_RespectLimit(t *testing.T) {
+	candidates := make([]*ThreatPattern, 15)
+	for i := 0; i < 15; i++ {
+		candidates[i] = &ThreatPattern{
+			ID:          "TMKB-00" + string(rune('1'+i)),
+			Name:        "Pattern",
+			Severity:    "high",
+			Likelihood:  "medium",
+			Description: "Desc",
+			AgentSummary: AgentSummary{
+				Threat: "T",
+				Check:  "C",
+				Fix:    "F",
+			},
+		}
+	}
+
+	result := buildVerboseResponse(candidates, 10)
+
+	if result.PatternCount != 15 {
+		t.Errorf("Expected pattern_count=15, got %d", result.PatternCount)
+	}
+
+	if result.PatternsIncluded != 10 {
+		t.Errorf("Expected patterns_included=10, got %d", result.PatternsIncluded)
+	}
+
+	if len(result.VerbosePatterns) != 10 {
+		t.Errorf("Expected 10 patterns, got %d", len(result.VerbosePatterns))
+	}
+}
