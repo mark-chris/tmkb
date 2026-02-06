@@ -330,3 +330,114 @@ func TestQuery_RelevanceOverridesSeverity(t *testing.T) {
 		t.Logf("With relevance scoring, the pattern matching 5 keywords should rank higher than 1 keyword match")
 	}
 }
+
+func TestQuery_AgentMode_TokenLimit(t *testing.T) {
+	idx := createTestIndex()
+
+	opts := QueryOptions{
+		Context:   "background job authorization",
+		Verbosity: "agent", // Explicit agent mode
+		Limit:     0,       // Use default
+	}
+
+	result := Query(idx, opts)
+
+	// Should use agent mode defaults
+	if result.TokenCount == 0 {
+		t.Error("Expected token_count to be set in agent mode")
+	}
+
+	if result.TokenCount > 500 {
+		t.Errorf("Token count %d exceeds limit of 500", result.TokenCount)
+	}
+
+	if len(result.Patterns) > 3 {
+		t.Errorf("Expected max 3 patterns in agent mode, got %d", len(result.Patterns))
+	}
+
+	if len(result.VerbosePatterns) != 0 {
+		t.Error("Expected no verbose patterns in agent mode")
+	}
+}
+
+func TestQuery_VerboseMode_NoTokenLimit(t *testing.T) {
+	idx := createTestIndex()
+
+	opts := QueryOptions{
+		Context:   "background job authorization",
+		Verbosity: "human", // Verbose mode
+		Limit:     0,       // Use default
+	}
+
+	result := Query(idx, opts)
+
+	// Should use verbose mode
+	if result.TokenCount != 0 {
+		t.Error("Expected token_count to be 0 in verbose mode")
+	}
+
+	if len(result.VerbosePatterns) == 0 {
+		t.Error("Expected verbose patterns in verbose mode")
+	}
+
+	if len(result.Patterns) != 0 {
+		t.Error("Expected no agent patterns in verbose mode")
+	}
+
+	// Check that verbose fields are populated
+	if len(result.VerbosePatterns) > 0 {
+		v := result.VerbosePatterns[0]
+		if v.Name == "" {
+			t.Error("Expected name in verbose mode")
+		}
+		if v.Threat == "" {
+			t.Error("Expected threat in verbose mode")
+		}
+		if v.Check == "" {
+			t.Error("Expected check in verbose mode")
+		}
+		if v.Fix == "" {
+			t.Error("Expected fix in verbose mode")
+		}
+	}
+}
+
+func TestQuery_VerboseMode_DefaultLimit(t *testing.T) {
+	// Create index with many patterns
+	patterns := make([]ThreatPattern, 15)
+	for i := 0; i < 15; i++ {
+		patterns[i] = ThreatPattern{
+			ID:       "TMKB-00" + string(rune('1'+i)),
+			Name:     "Pattern " + string(rune('1'+i)),
+			Severity: "high",
+			Likelihood: "medium",
+			Category: "authorization",
+			Language: "python",
+			Framework: "flask",
+			Triggers: Triggers{
+				Keywords: []string{"authorization"},
+			},
+			AgentSummary: AgentSummary{
+				Threat: "Threat",
+				Check:  "Check",
+				Fix:    "Fix",
+			},
+			Description: "Description",
+		}
+	}
+
+	idx := NewIndex()
+	idx.Build(patterns)
+
+	opts := QueryOptions{
+		Context:   "authorization",
+		Verbosity: "human",
+		Limit:     0, // Default should be 10
+	}
+
+	result := Query(idx, opts)
+
+	if result.PatternsIncluded != 10 {
+		t.Errorf("Expected default limit of 10 in verbose mode, got %d", result.PatternsIncluded)
+	}
+}

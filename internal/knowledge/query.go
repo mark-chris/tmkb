@@ -151,50 +151,20 @@ func Query(idx *Index, opts QueryOptions) QueryResult {
 		sortBySeverity(candidates)
 	}
 
-	// Apply limit (default to 3 for agent output)
-	limit := opts.Limit
-	if limit <= 0 {
-		if opts.Verbosity == "human" {
+	// Build response based on verbosity
+	if opts.Verbosity == "human" {
+		limit := opts.Limit
+		if limit <= 0 {
 			limit = 10
-		} else {
+		}
+		return buildVerboseResponse(candidates, limit)
+	} else {
+		limit := opts.Limit
+		if limit <= 0 {
 			limit = 3
 		}
+		return buildAgentResponse(candidates, limit)
 	}
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
-
-	// Build output
-	result := QueryResult{
-		PatternCount: len(candidates),
-		Patterns:     make([]PatternOutput, 0, len(candidates)),
-	}
-
-	for _, p := range candidates {
-		output := PatternOutput{
-			ID:       p.ID,
-			Severity: p.Severity,
-			Threat:   p.AgentSummary.Threat,
-			Check:    p.AgentSummary.Check,
-			Fix:      p.AgentSummary.Fix,
-		}
-
-		if opts.Verbosity == "human" {
-			output.Name = p.Name
-		}
-
-		result.Patterns = append(result.Patterns, output)
-	}
-
-	// Add code pattern from most relevant match
-	if len(candidates) > 0 {
-		codePattern := extractCodePattern(candidates[0], opts.Language, opts.Framework)
-		if codePattern != nil {
-			result.CodePattern = codePattern
-		}
-	}
-
-	return result
 }
 
 // filterByLanguage filters patterns by programming language
