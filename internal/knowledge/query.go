@@ -38,19 +38,47 @@ type PatternOutput struct {
 
 // PatternOutputVerbose is the human-facing detailed output
 type PatternOutputVerbose struct {
-	PatternOutput
-	Description      string           `json:"description"`
-	AttackNarrative  string           `json:"attack_narrative,omitempty"`
-	Mitigations      []MitigationBrief `json:"mitigations"`
-	RelatedPatterns  []string         `json:"related_patterns,omitempty"`
-	CWEReferences    []string         `json:"cwe_references,omitempty"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Severity          string                `json:"severity"`
+	Likelihood        string                `json:"likelihood"`
+	Threat            string                `json:"threat"`
+	Check             string                `json:"check"`
+	Fix               string                `json:"fix"`
+	Description       string                `json:"description"`
+	AttackScenario    *AttackScenarioOutput `json:"attack_scenario,omitempty"`
+	Mitigations       []MitigationVerbose   `json:"mitigations"`
+	RelatedPatterns   []string              `json:"related_patterns,omitempty"`
+	CWEReferences     []string              `json:"cwe_references,omitempty"`
+	OWASPReferences   []string              `json:"owasp_references,omitempty"`
 }
 
-// MitigationBrief is a summary of a mitigation
-type MitigationBrief struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Effectiveness string `json:"effectiveness"`
+// AttackScenarioOutput provides full attack scenario details
+type AttackScenarioOutput struct {
+	Narrative     string       `json:"narrative"`
+	Preconditions []string     `json:"preconditions"`
+	Steps         []AttackStep `json:"steps"`
+	Impact        Impact       `json:"impact"`
+}
+
+// MitigationVerbose provides detailed mitigation information
+type MitigationVerbose struct {
+	ID                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	Description          string               `json:"description"`
+	Effectiveness        string               `json:"effectiveness"`
+	ImplementationEffort string               `json:"implementation_effort"`
+	Tradeoffs            []string             `json:"tradeoffs,omitempty"`
+	CodeExamples         []CodeExampleVerbose `json:"code_examples,omitempty"`
+}
+
+// CodeExampleVerbose shows both vulnerable and secure code
+type CodeExampleVerbose struct {
+	Language       string `json:"language"`
+	Framework      string `json:"framework"`
+	Description    string `json:"description"`
+	VulnerableCode string `json:"vulnerable_code,omitempty"`
+	SecureCode     string `json:"secure_code,omitempty"`
 }
 
 // CodePatternOutput provides a code template for the most relevant pattern

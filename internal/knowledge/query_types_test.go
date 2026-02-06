@@ -42,14 +42,13 @@ func TestQueryResult_VerboseMode_JSON(t *testing.T) {
 		PatternsIncluded: 2,
 		VerbosePatterns: []PatternOutputVerbose{
 			{
-				PatternOutput: PatternOutput{
-					ID:       "TMKB-001",
-					Name:     "Test Pattern",
-					Severity: "high",
-					Threat:   "threat",
-					Check:    "check",
-					Fix:      "fix",
-				},
+				ID:          "TMKB-001",
+				Name:        "Test Pattern",
+				Severity:    "high",
+				Likelihood:  "medium",
+				Threat:      "threat",
+				Check:       "check",
+				Fix:         "fix",
 				Description: "Full description",
 			},
 		},
