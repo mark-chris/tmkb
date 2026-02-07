@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"log"
+	"os"
 
+	"github.com/mark-chris/tmkb/internal/mcp"
 	"github.com/spf13/cobra"
-)
-
-var (
-	servePort int
 )
 
 var serveCmd = &cobra.Command{
@@ -15,32 +14,29 @@ var serveCmd = &cobra.Command{
 	Short: "Start MCP server for AI agent integration",
 	Long: `Start a Model Context Protocol (MCP) server that AI agents can query.
 
-The MCP server exposes the tmkb_query tool for agent integration with
-Claude Code, Cursor, and other MCP-compatible AI coding assistants.
+The MCP server communicates via stdin/stdout using the JSON-RPC 2.0 protocol.
+It is designed to be invoked by MCP clients like Claude Code.
 
 Examples:
-  # Start server on default port
-  tmkb serve
-
-  # Start server on custom port
-  tmkb serve --port 3000`,
+  # Start MCP server (typically invoked by Claude Code)
+  tmkb serve`,
 	RunE: runServe,
 }
 
-func init() {
-	serveCmd.Flags().IntVar(&servePort, "port", 3000,
-		"Port to listen on")
-}
-
 func runServe(cmd *cobra.Command, args []string) error {
-	fmt.Printf("Starting MCP server on port %d...\n", servePort)
-	fmt.Println("Loaded", index.Count(), "patterns")
-	fmt.Println()
-	fmt.Println("MCP server implementation pending.")
-	fmt.Println("For now, use the CLI directly or integrate via stdout.")
-	
-	// TODO: Implement MCP server
-	// See internal/mcp/server.go for implementation
-	
+	// Create MCP server with the loaded pattern index
+	server := mcp.NewServer(index)
+
+	// Log to stderr (stdout is reserved for protocol communication)
+	log.SetOutput(os.Stderr)
+	log.Printf("Starting MCP server with %d patterns loaded", index.Count())
+	log.Println("Server ready for MCP protocol communication via stdio")
+
+	// Run server - blocks until stdin closes (EOF)
+	if err := server.ServeStdio(os.Stdin, os.Stdout); err != nil {
+		return fmt.Errorf("MCP server error: %w", err)
+	}
+
+	log.Println("MCP server shutdown")
 	return nil
 }
