@@ -99,6 +99,35 @@ go build -o bin/tmkb ./cmd/tmkb
 
 See [Query Response Format Documentation](docs/api/query-response-format.md) for complete API specification.
 
+## MCP Integration
+
+TMKB provides a Model Context Protocol (MCP) server for AI coding assistants like Claude Code.
+
+### Quick Start with Claude Code
+
+1. **Build TMKB**:
+   ```bash
+   go build -o tmkb cmd/tmkb/main.go
+   ```
+
+2. **Configure Claude Code**:
+   Add to `~/.claude/mcp_settings.json`:
+   ```json
+   {
+     "mcpServers": {
+       "tmkb": {
+         "command": "/path/to/tmkb",
+         "args": ["serve"]
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Code** and ask:
+   > Query TMKB for authorization security threats
+
+See [MCP Integration Guide](docs/mcp-integration.md) for detailed setup and troubleshooting.
+
 ## Pattern Coverage (MVP)
 
 ### Tier A (Full Depth)
