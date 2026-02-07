@@ -1,21 +1,54 @@
 package mcp
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"sync"
 
 	"github.com/mark-chris/tmkb/internal/knowledge"
 )
 
+// serverState represents the server lifecycle state
+type serverState int
+
+const (
+	stateNotInitialized serverState = iota
+	stateInitializing
+	stateInitialized
+)
+
 // Server implements the Model Context Protocol for TMKB
 type Server struct {
-	index *knowledge.Index
+	index              *knowledge.Index
+	state              serverState
+	protocolVersion    string
+	clientCapabilities map[string]interface{}
+	mu                 sync.RWMutex
 }
 
 // NewServer creates a new MCP server
 func NewServer(index *knowledge.Index) *Server {
-	return &Server{index: index}
+	return &Server{
+		index: index,
+		state: stateNotInitialized,
+	}
+}
+
+// setState sets the server state (thread-safe)
+func (s *Server) setState(state serverState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state = state
+}
+
+// getState gets the server state (thread-safe)
+func (s *Server) getState() serverState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state
 }
 
 // ToolDefinition returns the MCP tool definition for tmkb_query
@@ -86,13 +119,49 @@ func (s *Server) HandleRequest(input map[string]interface{}) (string, error) {
 }
 
 // ServeStdio runs the MCP server over stdin/stdout
-// This is a simplified implementation; full MCP requires more protocol handling
 func (s *Server) ServeStdio(r io.Reader, w io.Writer) error {
-	// TODO: Implement full MCP protocol
-	// For now, this is a placeholder that shows the intended interface
-	
-	fmt.Fprintln(w, "MCP server ready")
-	fmt.Fprintln(w, "Tool available: tmkb_query")
-	
+	scanner := bufio.NewScanner(r)
+	writer := bufio.NewWriter(w)
+
+	// Set max buffer size to 10MB
+	const maxBufferSize = 10 * 1024 * 1024
+	buf := make([]byte, maxBufferSize)
+	scanner.Buffer(buf, maxBufferSize)
+
+	for scanner.Scan() {
+		msg := scanner.Bytes()
+
+		// Handle message
+		resp, err := s.handleMessage(msg)
+		if err != nil {
+			log.Printf("[ERROR] Failed to handle message: %v", err)
+			continue
+		}
+
+		// Write response if non-empty (notifications have no response)
+		if len(resp) > 0 {
+			if _, err := writer.Write(resp); err != nil {
+				log.Printf("[ERROR] Failed to write response: %v", err)
+				return fmt.Errorf("failed to write response: %w", err)
+			}
+			if err := writer.WriteByte('\n'); err != nil {
+				log.Printf("[ERROR] Failed to write newline: %v", err)
+				return fmt.Errorf("failed to write newline: %w", err)
+			}
+			if err := writer.Flush(); err != nil {
+				log.Printf("[ERROR] Failed to flush writer: %v", err)
+				return fmt.Errorf("failed to flush writer: %w", err)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		// EOF is normal shutdown
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("scanner error: %w", err)
+	}
+
 	return nil
 }
