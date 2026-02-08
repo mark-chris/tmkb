@@ -31,16 +31,32 @@ Modern LLMs have substantial security knowledge for well-documented, syntax-leve
 
 ## Validation Results
 
-We tested Claude Code with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
+We tested Claude Code (Sonnet 4.5) with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
 
-| Invariant | Without TMKB | With TMKB |
-|-----------|--------------|-----------|
-| Auth check on mutating endpoints | ✅ Pass | ✅ Pass |
-| Object ownership validated server-side | ✅ Pass | ✅ Pass |
-| List/detail authorization consistency | ✅ Pass | ✅ Pass |
-| **Background jobs re-validate authorization** | ❌ **FAIL** | ✅ Pass |
+| Invariant | Without TMKB | With TMKB | Impact |
+|-----------|--------------|-----------|--------|
+| Auth check on mutating endpoints | ✅ Pass | ✅ Pass | Equal |
+| Object ownership validated server-side | ✅ Pass | ✅ Pass | **Architecture improved** |
+| List/detail authorization consistency | ✅ Pass | ✅ Pass | **Centralized logic** |
+| **Background jobs re-validate authorization** | ❌ **FAIL** | ✅ **PASS** | **Critical fix** |
 
-The generated Celery task accepted only `file_id`—no user context, no tenant validation. This is exactly the pattern TMKB-AUTHZ-001 catches.
+**The Critical Difference:**
+
+Without TMKB, the generated Celery task accepted only `file_id`—no user context, no tenant validation:
+```python
+def process_file(self, file_id):  # ❌ No authorization context
+    file_record = File.query.get(file_id)  # ❌ No tenant check
+```
+
+With TMKB, the task includes full authorization context and performs 5 validation checks:
+```python
+def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full context
+    """Security (TMKB-AUTHZ-001): Re-validates ALL authorization checks"""
+    file_record = File.get_for_tenant(file_id, tenant_id=organization_id)  # ✅ Tenant-filtered
+    # ... 4 additional authorization checks
+```
+
+This is exactly the pattern TMKB-AUTHZ-001 catches. See [full validation analysis](validation/smoke-test/analysis.md) for details.
 
 ## Quick Start
 
