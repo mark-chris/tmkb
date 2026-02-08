@@ -306,15 +306,21 @@ threat_pattern:
                             f"Cannot query {cls.__name__} without request context. "
                             "Use explicit tenant_id for background jobs."
                         )
-                    
+
                     if not current_user or not current_user.is_authenticated:
                         raise RuntimeError(
                             f"Cannot query {cls.__name__} without authenticated user"
                         )
-                    
-                    return cls.query.filter_by(
+
+                    query = cls.query.filter_by(
                         organization_id=current_user.organization_id
                     )
+
+                    # Automatically exclude soft-deleted records if model supports it
+                    if hasattr(cls, 'deleted_at'):
+                        query = query.filter(cls.deleted_at.is_(None))
+
+                    return query
                 
                 @classmethod
                 def get_for_tenant(cls, id, tenant_id=None):
@@ -326,7 +332,10 @@ threat_pattern:
                         query = cls.tenant_query()
                     else:
                         query = cls.query.filter_by(organization_id=tenant_id)
-                    
+                        # Also exclude soft-deleted in background jobs
+                        if hasattr(cls, 'deleted_at'):
+                            query = query.filter(cls.deleted_at.is_(None))
+
                     return query.filter_by(id=id).first_or_404()
             
             # File: app/models/project.py
