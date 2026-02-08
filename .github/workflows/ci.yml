@@ -104,7 +104,6 @@ jobs:
         format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
-        skip-dirs: 'validation/smoke-test/baseline'
       continue-on-error: true
 
     - name: Upload Trivy results to GitHub Security
