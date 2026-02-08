@@ -22,6 +22,4 @@ jobs:
       with:
         fail-on-severity: moderate
         comment-summary-in-pr: always
-        # LLM-generated requirements.txt in validation/smoke-test/baseline/
-        # are test artifacts, not actual project dependencies
-        allow-packages: 'pkg:pypi/werkzeug, pkg:pypi/flask, pkg:pypi/flask-login, pkg:pypi/flask-sqlalchemy, pkg:pypi/celery, pkg:pypi/redis'
+        config-file: '.github/dependency-review-config.yml'
