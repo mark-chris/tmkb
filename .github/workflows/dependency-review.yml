@@ -22,6 +22,6 @@ jobs:
       with:
         fail-on-severity: moderate
         comment-summary-in-pr: always
-        # Werkzeug safe_join() CVEs in validation/smoke-test/baseline/ artifacts
-        # (LLM-generated requirements.txt, not actual project dependencies)
-        allow-ghsas: 'GHSA-hgf8-39gv-g3f2, GHSA-87hc-h4r5-73f7'
+        # LLM-generated requirements.txt in validation/smoke-test/baseline/
+        # are test artifacts, not actual project dependencies
+        allow-packages: 'pkg:pypi/werkzeug, pkg:pypi/flask, pkg:pypi/flask-login, pkg:pypi/flask-sqlalchemy, pkg:pypi/celery, pkg:pypi/redis'
