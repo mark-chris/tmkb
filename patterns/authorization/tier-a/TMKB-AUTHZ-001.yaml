@@ -239,11 +239,18 @@ threat_pattern:
           secure_code: |
             # SECURE: Re-validate authorization in task
             # File: app/tasks.py
-            
+
+            # TMKB-AUTHZ-001: Background Job Authorization Checklist
+            # ✓ Task accepts user_id and tenant_id (not just resource ID)
+            # ✓ Load resource with explicit tenant filter
+            # ✓ Verify tenant match (double-check even after filtered load)
+            # ✓ Verify user still valid and belongs to tenant
+            # ✓ Verify resource not soft-deleted (if applicable)
+
             class AuthorizationError(Exception):
                 """Raised when job authorization fails"""
                 pass
-            
+
             @celery.task(bind=True, max_retries=3)
             def process_file(self, file_id, user_id, organization_id):
                 """Process uploaded file with authorization re-check"""
