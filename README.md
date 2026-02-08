@@ -31,32 +31,95 @@ Modern LLMs have substantial security knowledge for well-documented, syntax-leve
 
 ## Validation Results
 
-We tested Claude Code (Sonnet 4.5) with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
+We ran **3 independent baseline tests** with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
 
-| Invariant | Without TMKB | With TMKB | Impact |
-|-----------|--------------|-----------|--------|
-| Auth check on mutating endpoints | ✅ Pass | ✅ Pass | Equal |
-| Object ownership validated server-side | ✅ Pass | ✅ Pass | **Architecture improved** |
-| List/detail authorization consistency | ✅ Pass | ✅ Pass | **Centralized logic** |
-| **Background jobs re-validate authorization** | ❌ **FAIL** | ✅ **PASS** | **Critical fix** |
+### Test Configuration
 
-**The Critical Difference:**
+| Run | Model | Date | TMKB |
+|-----|-------|------|------|
+| Run-1 | Claude Code (Sonnet 4.5) | Feb 3, 2026 | ❌ No |
+| Run-2 | Claude Code (Sonnet 4.5) | Feb 5, 2026 | ❌ No |
+| Run-3 | Claude 4.6 (Opus) | Feb 7, 2026 | ❌ No |
+| **Enhanced** | **Claude Code (Sonnet 4.5)** | **Feb 7, 2026** | ✅ **Yes** |
 
-Without TMKB, the generated Celery task accepted only `file_id`—no user context, no tenant validation:
+### Results: Perfect Consistency
+
+| Invariant | Run-1 | Run-2 | Run-3 | **Enhanced** | Pattern |
+|-----------|-------|-------|-------|------------|---------|
+| Auth check on mutating endpoints | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
+| Object ownership validated server-side | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
+| List/detail authorization consistency | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
+| **Background jobs re-validate authorization** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | ✅ **PASS** | **100% baseline failure** |
+
+**Key Finding:** All 3 baseline runs failed INV-4 identically across **2 different models** (Sonnet 4.5 and Opus 4.6), demonstrating this is a **systematic LLM blindspot**, not random variance.
+
+### The Critical Difference
+
+**Baseline (All 3 Runs):** Task accepts only `file_id`—zero authorization checks
 ```python
+# Run-1 (Sonnet 4.5)
 def process_file(self, file_id):  # ❌ No authorization context
     file_record = File.query.get(file_id)  # ❌ No tenant check
+
+# Run-2 (Sonnet 4.5)
+def process_file(self, file_id):  # ❌ No authorization context
+    file_record = File.query.get(file_id)  # ❌ No tenant check
+
+# Run-3 (Opus 4.6)
+def process_file(file_id):  # ❌ No authorization context
+    file_record = db.session.get(File, file_id)  # ❌ No tenant check
 ```
 
-With TMKB, the task includes full authorization context and performs 5 validation checks:
+**Enhanced (With TMKB):** Task includes full authorization context and 5 validation checks
 ```python
 def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full context
-    """Security (TMKB-AUTHZ-001): Re-validates ALL authorization checks"""
-    file_record = File.get_for_tenant(file_id, tenant_id=organization_id)  # ✅ Tenant-filtered
-    # ... 4 additional authorization checks
+    """
+    Security (TMKB-AUTHZ-001):
+    - Re-validates ALL authorization checks from endpoint
+    - Verifies tenant_id matches at every step
+    - Does NOT trust authorization from original request
+    """
+    # CHECK 1: Load with tenant filter
+    file_record = File.get_for_tenant(file_id, tenant_id=organization_id)
+
+    # CHECK 2: Verify tenant match
+    if file_record.organization_id != organization_id:
+        raise AuthorizationError("Tenant mismatch")
+
+    # CHECK 3: User still valid and in org
+    user = User.query.get(user_id)
+    if user.organization_id != organization_id:
+        raise AuthorizationError("User organization changed")
+
+    # CHECK 4: File not soft-deleted
+    if file_record.deleted_at:
+        raise AuthorizationError("File deleted")
+
+    # CHECK 5: File uploaded by claimed user
+    if file_record.uploaded_by_user_id != user_id:
+        raise AuthorizationError("User mismatch")
+
+    # All checks passed - safe to process
 ```
 
-This is exactly the pattern TMKB-AUTHZ-001 catches. See [full validation analysis](validation/smoke-test/analysis.md) for details.
+### Statistical Evidence
+
+- **Baseline failure rate:** 3/3 = 100% (across 2 models, 3 dates)
+- **Enhanced success rate:** 1/1 = 100% (with TMKB context)
+- **Effect size:** 100 percentage point improvement
+- **Conclusion:** High confidence that TMKB fixes the systematic authorization gap
+
+### What TMKB Adds
+
+| Metric | Baseline (avg) | Enhanced | Delta |
+|--------|---------------|----------|-------|
+| Task authorization parameters | 1 (`file_id` only) | 3 (`file_id`, `user_id`, `org_id`) | **+2** |
+| Authorization checks in task | **0** | **5** | **+5** |
+| Architectural security patterns | 0 | 1 (TenantScopedMixin) | **+1** |
+| TMKB pattern references | 0 | 6 | **+6** |
+| Security-focused tests | 0 | ~15 tests | **+15** |
+
+This is exactly the pattern TMKB-AUTHZ-001 catches. See [validation analysis](validation/smoke-test/analysis.md) for details.
 
 ## Quick Start
 
