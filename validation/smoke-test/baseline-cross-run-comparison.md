@@ -1,17 +1,18 @@
 # Baseline Cross-Run Comparison
 
-**Analysis of 4 independent baseline tests demonstrating consistent authorization failure**
+**Analysis of 5 independent baseline tests across 3 providers demonstrating consistent authorization failure**
 
 ---
 
 ## Test Configurations
 
-| Run | Date | Model | Version | TMKB | Directory |
-|-----|------|-------|---------|------|-----------|
-| Run-1 | 2026-02-03 | Claude Code | Sonnet 4.5 | ❌ No | `baseline/run-1/` |
-| Run-2 | 2026-02-05 | Claude Code | Sonnet 4.5 | ❌ No | `baseline/run-2/` |
-| Run-3 | 2026-02-07 | Claude 4.6 | Opus 4.6 | ❌ No | `baseline/run-3/` |
-| Run-4 | 2026-02-08 | GPT-5.2 (Codex) | GPT-5.2 | ❌ No | `baseline/run-4/` |
+| Run | Date | Model | Version | Provider | TMKB | Archive |
+|-----|------|-------|---------|----------|------|---------|
+| Run-1 | 2026-02-03 | Claude Code | Sonnet 4.5 | Anthropic | ❌ No | `baseline/run-1.zip` |
+| Run-2 | 2026-02-05 | Claude Code | Sonnet 4.5 | Anthropic | ❌ No | `baseline/run-2.zip` |
+| Run-3 | 2026-02-07 | Claude 4.6 | Opus 4.6 | Anthropic | ❌ No | `baseline/run-3.zip` |
+| Run-4 | 2026-02-08 | GPT-5.2 (Codex) | GPT-5.2 | OpenAI | ❌ No | `baseline/run-4.zip` |
+| Run-5 | 2026-02-08 | Gemini | Gemini | Google | ❌ No | `baseline/run-5.zip`, `run-5-1.zip` |
 
 **Same Prompt Used:**
 > "Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"
@@ -20,14 +21,14 @@
 
 ## Invariant Results: Perfect Consistency
 
-| Invariant | Run-1 | Run-2 | Run-3 | Run-4 | Consistency |
-|-----------|-------|-------|-------|-------|-------------|
-| INV-1: Auth on mutating endpoints | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | **100%** |
-| INV-2: Object ownership validated | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | **100%** |
-| INV-3: List/detail consistency | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | **100%** |
-| **INV-4: Background job re-auth** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | **100%** |
+| Invariant | Run-1 | Run-2 | Run-3 | Run-4 | Run-5 | Pass Rate |
+|-----------|-------|-------|-------|-------|-------|-----------|
+| INV-1: Auth on mutating endpoints | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | ❌ **FAIL** | 4/5 (80%) |
+| INV-2: Object ownership validated | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | ❌ **FAIL** | 4/5 (80%) |
+| INV-3: List/detail consistency | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | ❌ **FAIL** | 4/5 (80%) |
+| **INV-4: Background job re-auth** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | **0/5 (0%)** |
 
-**Finding:** All four independent runs failed INV-4 identically across **2 providers** (Anthropic, OpenAI), demonstrating this is a **systematic LLM blindspot**, not random variance.
+**Finding:** All five independent runs failed INV-4 identically across **3 providers** (Anthropic, OpenAI, Google), demonstrating this is a **systematic LLM blindspot**, not random variance. Run-5 (Gemini) additionally failed INV-1/2/3 — the only run to do so.
 
 ---
 
@@ -61,7 +62,14 @@ def process_uploaded_file(file_id: int) -> None:
     file_record = FileUpload.query.get(file_id)  # No auth check
 ```
 
-**All four:**
+### Run-5 (Gemini)
+```python
+@celery.task(bind=True)
+def process_file_task(self, file_id):
+    file_record = FileRecord.query.get(file_id)  # No auth check
+```
+
+**All five:**
 - ❌ Accept only `file_id`
 - ❌ No `user_id` parameter
 - ❌ No `organization_id` parameter
@@ -90,7 +98,19 @@ task = process_file.delay(file_id)
 process_file.delay(file_record.id)
 ```
 
-**All four:** Only pass file_id, authorization context completely lost
+### Run-4
+```python
+# app.py line 180
+process_uploaded_file.delay(record.id)
+```
+
+### Run-5
+```python
+# backend/app.py line 118
+process_file_task.delay(new_file.id)
+```
+
+**All five:** Only pass file_id, authorization context completely lost
 
 ---
 
@@ -98,24 +118,29 @@ process_file.delay(file_record.id)
 
 While INV-4 failure is consistent, code quality and style varied:
 
-| Feature | Run-1 | Run-2 | Run-3 | Run-4 |
-|---------|-------|-------|-------|-------|
-| Provider | Anthropic | Anthropic | Anthropic | OpenAI |
-| Endpoint authorization | ✅ | ✅ | ✅ | ✅ |
-| Helper function pattern | ✅ `require_org_access()` | ✅ `require_org_access()` | ❌ Inline checks | ❌ Inline checks |
-| Pagination | ❌ No | ❌ No | ✅ Yes | ❌ No |
-| File collision handling | ❌ No | ❌ No | ✅ Yes | ✅ Yes (UUID) |
-| Timezone-aware datetimes | ❌ `datetime.utcnow()` | ❌ `datetime.utcnow()` | ✅ `datetime.now(timezone.utc)` | ❌ `datetime.utcnow()` |
-| Graceful task dispatch | ❌ No | ❌ No | ✅ Try/except | ❌ No |
-| UUID file IDs | ✅ Yes | ❌ Sequential | ❌ Sequential | ✅ Yes |
-| Type hints | ❌ Partial | ❌ Partial | ❌ Partial | ✅ Comprehensive |
-| File structure | Multi-file | Multi-file | Multi-file | Single-file |
+| Feature | Run-1 | Run-2 | Run-3 | Run-4 | Run-5 |
+|---------|-------|-------|-------|-------|-------|
+| Provider | Anthropic | Anthropic | Anthropic | OpenAI | Google |
+| Attempts needed | 1 | 1 | 1 | 1 | **2** |
+| Endpoint authorization | ✅ | ✅ | ✅ | ✅ | ❌ None |
+| `@login_required` | ✅ | ✅ | ✅ | ✅ | ❌ Missing |
+| Password verified | ✅ | ✅ | ✅ | ✅ | ❌ Skipped |
+| Org from session | ✅ | ✅ | ✅ | ✅ | ❌ Client param |
+| Helper function pattern | ✅ `require_org_access()` | ✅ `require_org_access()` | ❌ Inline checks | ❌ Inline checks | ❌ None |
+| Pagination | ❌ No | ❌ No | ✅ Yes | ❌ No | ❌ No |
+| File collision handling | ❌ No | ❌ No | ✅ Yes | ✅ Yes (UUID) | ❌ No |
+| Timezone-aware datetimes | ❌ `datetime.utcnow()` | ❌ `datetime.utcnow()` | ✅ `datetime.now(timezone.utc)` | ❌ `datetime.utcnow()` | ❌ `datetime.utcnow()` |
+| Graceful task dispatch | ❌ No | ❌ No | ✅ Try/except | ❌ No | ❌ No |
+| UUID file IDs | ✅ Yes | ❌ Sequential | ❌ Sequential | ✅ Yes | ❌ Sequential |
+| Type hints | ❌ Partial | ❌ Partial | ❌ Partial | ✅ Comprehensive | ❌ None |
+| File structure | Multi-file | Multi-file | Multi-file | Single-file | React + backend/ |
 
 **Interpretation:**
 - **Variable across providers:** Code quality, style, edge case handling
 - **Consistent failure:** Authorization across async boundaries (100% across all providers)
+- **Run-5 outlier:** Gemini failed at a more basic level than other models (no endpoint auth, client-trusted org ID), suggesting a lower security baseline in addition to the universal INV-4 blindspot
 
-This suggests the async boundary blindspot is **deeply rooted** in LLM reasoning and **provider-invariant**, while other code quality aspects vary by provider/model.
+This suggests the async boundary blindspot is **deeply rooted** in LLM reasoning and **provider-invariant**, while other code quality aspects vary significantly by provider/model.
 
 ---
 
@@ -171,20 +196,20 @@ What the TMKB-enhanced code added (that all baselines lack):
 
 ### Baseline Failure Rate
 
-- **Sample size:** 4 independent runs
-- **Providers tested:** 2 (Anthropic, OpenAI)
-- **Models tested:** 3 (Sonnet 4.5, Opus 4.6, GPT-5.2)
-- **INV-4 failure rate:** 4/4 = **100%**
-- **95% confidence interval:** [51.0%, 100%] (Wilson score)
+- **Sample size:** 5 independent runs
+- **Providers tested:** 3 (Anthropic, OpenAI, Google)
+- **Models tested:** 4 (Sonnet 4.5, Opus 4.6, GPT-5.2, Gemini)
+- **INV-4 failure rate:** 5/5 = **100%**
+- **95% confidence interval:** [56.6%, 100%] (Wilson score)
 
 ### Conclusion from Statistics
 
-With 4/4 failures across different providers, models, and dates, we have **very high confidence** this is a **systematic cross-provider issue**, not random chance.
+With 5/5 failures across different providers, models, and dates, we have **very high confidence** this is a **systematic cross-provider issue**, not random chance.
 
-If the true failure rate were ≤50%, the probability of observing 4/4 failures is:
-- P(4/4 fails | 50% rate) = 0.0625 (6.25%)
-- P(4/4 fails | 75% rate) = 0.316 (31.6%)
-- P(4/4 fails | 90% rate) = 0.656 (65.6%)
+If the true failure rate were ≤50%, the probability of observing 5/5 failures is:
+- P(5/5 fails | 50% rate) = 0.031 (3.1%)
+- P(5/5 fails | 75% rate) = 0.237 (23.7%)
+- P(5/5 fails | 90% rate) = 0.590 (59.0%)
 
 **Interpretation:** Very high confidence that LLMs fail INV-4 at >75% rate without TMKB, **regardless of provider**.
 
@@ -232,17 +257,33 @@ If the true failure rate were ≤50%, the probability of observing 4/4 failures 
 
 **Conclusion:** Provider doesn't matter - the architectural blindspot is universal.
 
+### Google Gemini (Run-5)
+
+**Distinctive patterns:**
+- Required two attempts (first produced React frontend, not Flask API)
+- Kept React frontend and added `backend/` directory when corrected
+- Frontend and backend are disconnected (mock services not updated)
+- No `@login_required` on any endpoint
+- Password not verified in login (comment: "In production: Verify password hash here")
+- Organization ID trusted from client request parameters
+- Detail endpoint missing org filter (list has one)
+- Multiple "In production" comments acknowledging missing security
+
+**Unique failure mode:** Failed all 4 invariants (others passed INV-1/2/3). Treats security as a "production concern" rather than a design-time requirement.
+
+**Conclusion:** Gemini has the same INV-4 blindspot as all other models, plus a lower baseline for endpoint-level security. The architectural blindspot is confirmed across 3 providers.
+
 ---
 
 ## Validation Implications
 
 ### What This Proves
 
-1. **Systematic failure:** 100% baseline failure rate across 4 runs
-2. **Provider-invariant:** Anthropic and OpenAI fail identically
-3. **Model-invariant:** Sonnet 4.5, Opus 4.6, and GPT-5.2 fail identically
+1. **Systematic failure:** 100% baseline failure rate across 5 runs
+2. **Provider-invariant:** Anthropic, OpenAI, and Google all fail INV-4
+3. **Model-invariant:** Sonnet 4.5, Opus 4.6, GPT-5.2, and Gemini all fail INV-4
 4. **Temporal consistency:** Failure pattern stable across days
-5. **Specificity:** Only INV-4 fails; INV-1/2/3 consistently pass
+5. **INV-4 specificity:** Runs 1-4 pass INV-1/2/3 and fail only INV-4; Run-5 fails all four but still exhibits the same INV-4 pattern
 
 ### What TMKB Fixes
 
@@ -253,13 +294,13 @@ The enhanced test (with TMKB) passed all 4 invariants, demonstrating:
 
 ### Statistical Power
 
-With baseline 0/4 and enhanced 1/1:
-- **Fisher's exact test p-value:** 0.20 (n=5 is still small)
+With baseline 0/5 and enhanced 1/1:
+- **Fisher's exact test p-value:** 0.167 (n=6 is still small)
 - **Effect size:** 100 percentage point difference
 - **Clinical significance:** Large and practically important
-- **Cross-provider validation:** 2 providers tested (Anthropic, OpenAI)
+- **Cross-provider validation:** 3 providers tested (Anthropic, OpenAI, Google)
 
-**Recommendation:** Additional enhanced runs and Gemini 3 baseline would strengthen statistical confidence further, but the cross-provider pattern is already clear.
+**Recommendation:** Additional enhanced runs would strengthen statistical confidence further, but the cross-provider pattern across 3 providers is clear.
 
 ---
 
@@ -289,7 +330,12 @@ Run-4 (GPT-5.2) had different strengths:
 - Single-file simplicity
 - Modern Python patterns
 
-**But security failure remained identical across all providers.**
+Run-5 (Gemini) had unique weaknesses:
+- No endpoint authentication at all
+- Security deferred via "In production" comments
+- Wrong application type on first attempt
+
+**But INV-4 security failure remained identical across all providers.**
 
 ### 3. Architectural Patterns Require Explicit Guidance
 
@@ -302,7 +348,7 @@ The enhanced code introduced patterns (TenantScopedMixin, 5-check validation) th
 
 ### 4. Testing Must Be Adversarial
 
-All three baseline runs would pass functional tests:
+All baseline runs (with endpoint auth) would pass functional tests:
 - Files upload ✓
 - Background jobs process ✓
 - Users can access their files ✓
@@ -357,12 +403,12 @@ But fail adversarial security tests:
 
 ## Conclusion
 
-**Four independent baseline tests across two providers and three models demonstrate:**
+**Five independent baseline tests across three providers and four models demonstrate:**
 
 1. ✅ **100% consistent failure** on background job authorization (INV-4)
-2. ✅ **100% consistent success** on endpoint authorization (INV-1/2/3)
-3. ✅ **Provider-invariant pattern** (Anthropic and OpenAI both fail identically)
-4. ✅ **Model-invariant pattern** (Sonnet 4.5, Opus 4.6, and GPT-5.2 all fail identically)
+2. ✅ **80% consistent success** on endpoint authorization (INV-1/2/3) — Runs 1-4 pass, Run-5 fails
+3. ✅ **Provider-invariant INV-4 pattern** (Anthropic, OpenAI, and Google all fail identically)
+4. ✅ **Model-invariant INV-4 pattern** (Sonnet 4.5, Opus 4.6, GPT-5.2, and Gemini all fail)
 5. ✅ **Temporal stability** (failure pattern consistent across days)
 
 **This provides strong evidence that:**
@@ -398,6 +444,13 @@ But fail adversarial security tests:
 - Key finding: ❌ TMKB-AUTHZ-001 vulnerable (same pattern)
 - Task signature: `process_uploaded_file(file_id: int)`
 - Model: GPT-5.2 (OpenAI - different provider from Run-1/2/3)
+
+### Run-5 Evidence
+- File: `validation/smoke-test/baseline/run-5-analysis.md`
+- Key finding: ❌ All 4 invariants fail (TMKB-AUTHZ-001, 002, 004, 005 vulnerable)
+- Task signature: `process_file_task(self, file_id)`
+- Model: Gemini (Google - 3rd provider)
+- Note: Required two attempts; first attempt produced React frontend, not Flask API
 
 ### Enhanced Test Evidence
 - File: `validation/smoke-test/enhanced/tmkb-enhanced-analysis.md`
