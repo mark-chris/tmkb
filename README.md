@@ -31,54 +31,56 @@ Modern LLMs have substantial security knowledge for well-documented, syntax-leve
 
 ## Validation Results
 
-We ran **3 independent baseline tests** with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
+We ran **5 independent baseline tests** across **3 providers** with the prompt: *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
 
 ### Test Configuration
 
-| Run | Model | Date | TMKB |
-|-----|-------|------|------|
-| Run-1 | Claude Code (Sonnet 4.5) | Feb 3, 2026 | ❌ No |
-| Run-2 | Claude Code (Sonnet 4.5) | Feb 5, 2026 | ❌ No |
-| Run-3 | Claude 4.6 (Opus) | Feb 7, 2026 | ❌ No |
-| **Enhanced** | **Claude Code (Sonnet 4.5)** | **Feb 7, 2026** | ✅ **Yes** |
+| Run | Model | Provider | Date | TMKB |
+|-----|-------|----------|------|------|
+| Run-1 | Claude Sonnet 4.5 | Anthropic | Feb 3, 2026 | ❌ No |
+| Run-2 | Claude Sonnet 4.5 | Anthropic | Feb 5, 2026 | ❌ No |
+| Run-3 | Claude Opus 4.6 | Anthropic | Feb 7, 2026 | ❌ No |
+| Run-4 | GPT-5.2 | OpenAI | Feb 8, 2026 | ❌ No |
+| Run-5 | Gemini | Google | Feb 8, 2026 | ❌ No |
+| **Enhanced** | **Claude Sonnet 4.5** | **Anthropic** | **Feb 7, 2026** | ✅ **Yes** |
 
-### Results: Perfect Consistency
+### Results: INV-4 Fails 100% Across All Providers
 
-| Invariant | Run-1 | Run-2 | Run-3 | **Enhanced** | Pattern |
-|-----------|-------|-------|-------|------------|---------|
-| Auth check on mutating endpoints | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
-| Object ownership validated server-side | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
-| List/detail authorization consistency | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | Consistent |
-| **Background jobs re-validate authorization** | ❌ **FAIL** | ❌ **FAIL** | ❌ **FAIL** | ✅ **PASS** | **100% baseline failure** |
+| Invariant | Run-1 | Run-2 | Run-3 | Run-4 | Run-5 | **Enhanced** |
+|-----------|-------|-------|-------|-------|-------|------------|
+| Auth on mutating endpoints | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Object ownership validated | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| List/detail consistency | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Background job re-auth** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ **PASS** |
 
-**Key Finding:** All 3 baseline runs failed INV-4 identically across **2 different models** (Sonnet 4.5 and Opus 4.6), demonstrating this is a **systematic LLM blindspot**, not random variance.
+**Key Finding:** All 5 baseline runs failed INV-4 identically across **3 providers** (Anthropic, OpenAI, Google) and **4 models**, demonstrating this is a **systematic, provider-invariant LLM blindspot**.
+
+Run-5 (Gemini) additionally failed INV-1/2/3 — the only run to do so. It required two attempts to produce a Flask API (first attempt generated a React frontend), had no `@login_required` on any endpoint, and trusted client-provided organization IDs.
 
 ### The Critical Difference
 
-**Baseline (All 3 Runs):** Task accepts only `file_id`—zero authorization checks
+**Baseline (All 5 Runs):** Task accepts only `file_id` — zero authorization checks
 ```python
-# Run-1 (Sonnet 4.5)
-def process_file(self, file_id):  # ❌ No authorization context
-    file_record = File.query.get(file_id)  # ❌ No tenant check
+# Run-1/2 (Claude Sonnet 4.5)
+def process_file(self, file_id):
+    file_record = File.query.get(file_id)         # ❌ No auth
 
-# Run-2 (Sonnet 4.5)
-def process_file(self, file_id):  # ❌ No authorization context
-    file_record = File.query.get(file_id)  # ❌ No tenant check
+# Run-3 (Claude Opus 4.6)
+def process_file(file_id):
+    file_record = db.session.get(File, file_id)    # ❌ No auth
 
-# Run-3 (Opus 4.6)
-def process_file(file_id):  # ❌ No authorization context
-    file_record = db.session.get(File, file_id)  # ❌ No tenant check
+# Run-4 (GPT-5.2)
+def process_uploaded_file(file_id: int) -> None:
+    file_record = FileUpload.query.get(file_id)    # ❌ No auth
+
+# Run-5 (Gemini)
+def process_file_task(self, file_id):
+    file_record = FileRecord.query.get(file_id)    # ❌ No auth
 ```
 
 **Enhanced (With TMKB):** Task includes full authorization context and 5 validation checks
 ```python
 def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full context
-    """
-    Security (TMKB-AUTHZ-001):
-    - Re-validates ALL authorization checks from endpoint
-    - Verifies tenant_id matches at every step
-    - Does NOT trust authorization from original request
-    """
     # CHECK 1: Load with tenant filter
     file_record = File.get_for_tenant(file_id, tenant_id=organization_id)
 
@@ -98,16 +100,14 @@ def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full cont
     # CHECK 5: File uploaded by claimed user
     if file_record.uploaded_by_user_id != user_id:
         raise AuthorizationError("User mismatch")
-
-    # All checks passed - safe to process
 ```
 
 ### Statistical Evidence
 
-- **Baseline failure rate:** 3/3 = 100% (across 2 models, 3 dates)
+- **Baseline INV-4 failure rate:** 5/5 = 100% (3 providers, 4 models)
+- **95% confidence interval:** [56.6%, 100%] (Wilson score)
 - **Enhanced success rate:** 1/1 = 100% (with TMKB context)
 - **Effect size:** 100 percentage point improvement
-- **Conclusion:** High confidence that TMKB fixes the systematic authorization gap
 
 ### What TMKB Adds
 
@@ -119,7 +119,7 @@ def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full cont
 | TMKB pattern references | 0 | 6 | **+6** |
 | Security-focused tests | 0 | ~15 tests | **+15** |
 
-This is exactly the pattern TMKB-AUTHZ-001 catches. See [validation analysis](validation/smoke-test/analysis.md) for details.
+See [cross-run comparison](validation/smoke-test/baseline-cross-run-comparison.md) and individual run analyses in [validation/smoke-test/baseline/](validation/smoke-test/baseline/) for details.
 
 ## Quick Start
 
