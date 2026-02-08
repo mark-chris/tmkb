@@ -22,3 +22,6 @@ jobs:
       with:
         fail-on-severity: moderate
         comment-summary-in-pr: always
+        # Werkzeug safe_join() CVEs in validation/smoke-test/baseline/ artifacts
+        # (LLM-generated requirements.txt, not actual project dependencies)
+        allow-ghsas: 'GHSA-hgf8-39gv-g3f2, GHSA-87hc-h4r5-73f7'
