@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -35,6 +36,8 @@ func TestValidateContext(t *testing.T) {
 		{"Valid", "background job processing", false, ""},
 		{"Empty", "", true, "context must be non-empty"},
 		{"Whitespace", "   ", true, "context must be non-empty"},
+		{"At max length", strings.Repeat("a", maxContextLength), false, ""},
+		{"Exceeds max length", strings.Repeat("a", maxContextLength+1), true, "context exceeds maximum length of 10000 characters"},
 	}
 
 	for _, tt := range tests {

@@ -96,7 +96,6 @@ func findPatternsDir() string {
 	candidates := []string{
 		"patterns",
 		"./patterns",
-		"../patterns",
 		filepath.Join(os.Getenv("HOME"), ".tmkb", "patterns"),
 		"/usr/local/share/tmkb/patterns",
 	}

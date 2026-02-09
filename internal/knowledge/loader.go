@@ -121,10 +121,18 @@ func (l *Loader) validatePath(path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve path: %w", err)
 	}
+	// Resolve symlinks when path exists to prevent symlink-based traversal
+	if resolved, resolveErr := filepath.EvalSymlinks(cleanPath); resolveErr == nil {
+		cleanPath = resolved
+	}
 
 	cleanBase, err := filepath.Abs(filepath.Clean(l.basePath))
 	if err != nil {
 		return fmt.Errorf("failed to resolve base path: %w", err)
+	}
+	// Resolve symlinks for base path (should always exist at runtime)
+	if resolved, resolveErr := filepath.EvalSymlinks(cleanBase); resolveErr == nil {
+		cleanBase = resolved
 	}
 
 	// Check if the clean path is within the base path
