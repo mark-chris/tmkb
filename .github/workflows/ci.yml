@@ -80,16 +80,15 @@ jobs:
         cache: true
 
     - name: Run gosec
-      uses: securego/gosec@master
+      uses: securego/gosec@424fc4cd9c82ea0fd6bee9cd49c2db2c3cc0c93f # v2.22.11
       with:
-        args: '-no-fail -fmt sarif -out gosec-results.sarif ./...'
-      continue-on-error: true
+        args: '-fmt sarif -out gosec-results.sarif ./...'
 
     - name: Upload gosec results to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: gosec-results.sarif
-      continue-on-error: true
+      if: always()
 
     - name: Run govulncheck
       run: |
@@ -97,20 +96,19 @@ jobs:
         govulncheck ./...
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
       with:
         scan-type: 'fs'
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
-      continue-on-error: true
 
     - name: Upload Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: trivy-results.sarif
-      continue-on-error: true
+      if: always()
 
   validate:
     name: Validate Patterns

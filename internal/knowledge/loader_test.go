@@ -185,6 +185,39 @@ func TestLoadFile_ValidFile(t *testing.T) {
 	}
 }
 
+// TestValidatePath_SymlinkTraversal tests that symlinks pointing outside base are blocked
+func TestValidatePath_SymlinkTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	baseDir := filepath.Join(tmpDir, "patterns")
+	outsideDir := filepath.Join(tmpDir, "outside")
+
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		t.Fatalf("Failed to create base directory: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0755); err != nil {
+		t.Fatalf("Failed to create outside directory: %v", err)
+	}
+
+	// Create a target file outside the base directory
+	outsideFile := filepath.Join(outsideDir, "secret.yaml")
+	if err := os.WriteFile(outsideFile, []byte("secret data"), 0644); err != nil {
+		t.Fatalf("Failed to create outside file: %v", err)
+	}
+
+	// Create a symlink inside the base directory pointing outside
+	symlinkPath := filepath.Join(baseDir, "evil.yaml")
+	if err := os.Symlink(outsideFile, symlinkPath); err != nil {
+		t.Skipf("Cannot create symlinks (permission denied): %v", err)
+	}
+
+	loader := NewLoader(baseDir)
+	err := loader.validatePath(symlinkPath)
+
+	if err == nil {
+		t.Error("validatePath with symlink traversal returned nil, want error")
+	}
+}
+
 // TestLoadAll_SecurityIsolation tests that LoadAll respects path boundaries
 func TestLoadAll_SecurityIsolation(t *testing.T) {
 	// Create temporary directory structure

@@ -13,10 +13,16 @@ func validateToolName(name string) error {
 	return nil
 }
 
+// Maximum allowed length for the context parameter (in bytes)
+const maxContextLength = 10000
+
 // validateContext validates the context parameter
 func validateContext(context string) error {
 	if strings.TrimSpace(context) == "" {
 		return fmt.Errorf("context must be non-empty")
+	}
+	if len(context) > maxContextLength {
+		return fmt.Errorf("context exceeds maximum length of %d characters", maxContextLength)
 	}
 	return nil
 }
