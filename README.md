@@ -121,14 +121,37 @@ def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full cont
 
 See [cross-run comparison](validation/smoke-test/baseline-cross-run-comparison.md) and individual run analyses in [validation/smoke-test/baseline/](validation/smoke-test/baseline/) for details.
 
+## Installation
+
+### Prerequisites
+
+- **Go 1.25+**: [Download Go](https://go.dev/dl/)
+- **Git**: For cloning the repository
+
+### From Source
+
+```bash
+# Clone
+git clone https://github.com/mark-chris/tmkb.git
+cd tmkb
+
+# Build
+go build -o bin/tmkb ./cmd/tmkb
+
+# (Optional) Install to GOPATH
+go install ./cmd/tmkb
+```
+
+Or using [Task](https://taskfile.dev/):
+```bash
+task setup && task build
+```
+
 ## Quick Start
 
 ### CLI Usage
 
 ```bash
-# Build
-go build -o bin/tmkb ./cmd/tmkb
-
 # Query patterns by context (agent mode - default)
 ./bin/tmkb query --context "background job processing"
 
