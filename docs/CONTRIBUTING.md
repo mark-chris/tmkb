@@ -1,182 +1,184 @@
 # Contributing to TMKB
 
-Thank you for your interest in contributing to the Threat Model Knowledge Base. This guide will help you get started.
+Thank you for your interest in contributing to the Threat Model Knowledge Base.
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Go 1.25+**: [Download Go](https://go.dev/dl/)
-- **Git**: For version control
-- **Task** (optional): [Task runner](https://taskfile.dev/) for build automation
+- Go 1.25+
+- Git
 
 ### Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/mark-chris/tmkb.git
 cd tmkb
-
-# Install dependencies
-go mod download
-
-# Build
 go build -o bin/tmkb ./cmd/tmkb
-
-# Run tests
 go test ./...
-
-# Validate patterns
-./bin/tmkb validate --all
 ```
 
-Or using Task:
+### Verify your setup
+
 ```bash
-task setup
-task build
-task test
-task validate
+./bin/tmkb validate --all
+./bin/tmkb list
+./bin/tmkb query --context "background job processing"
 ```
 
-## Types of Contributions
+## Adding a New Threat Pattern
 
-### 1. New Threat Patterns
+Patterns live in `patterns/authorization/` under `tier-a/` or `tier-b/` directories.
 
-The most impactful contribution. See [PATTERN_GUIDE.md](PATTERN_GUIDE.md) for how to create patterns.
+### Choosing a Tier
 
-**Before creating a pattern:**
-- Check existing patterns to avoid duplication
-- Verify the pattern represents an **architectural** security concern (not syntax-level)
-- Confirm it's a demonstrable LLM blindspot (ideally with a baseline test)
+| Tier | Depth | Requirements |
+|------|-------|-------------|
+| **A** | Full depth | Attack scenario, code examples (vulnerable + secure), security principles, testing guidance, generalization list |
+| **B** | Essential coverage | Agent summary, mitigations with code examples, triggers |
 
-### 2. Language/Framework Examples
+Use Tier A for patterns where you can demonstrate a concrete, validated LLM blindspot with before/after code. Use Tier B for known authorization anti-patterns that need concise coverage.
 
-Existing patterns have Python/Flask examples. Adding examples for other languages and frameworks increases TMKB's usefulness:
+### Pattern File Structure
 
-- Node.js (Express + Bull/BullMQ)
-- Go (net/http + Temporal/Asynq)
-- Ruby (Rails + Sidekiq/ActiveJob)
-- Java (Spring + @Async)
+Create a new YAML file: `patterns/authorization/tier-{a,b}/TMKB-AUTHZ-NNN.yaml`
 
-### 3. Validation Runs
+Use the next available ID number. The file must be wrapped in a top-level `threat_pattern:` key.
 
-Running baseline tests with different AI models strengthens the statistical evidence:
+#### Required Fields (All Tiers)
 
-1. Follow the protocol in [PROTOCOL.md](../validation/PROTOCOL.md)
-2. Use the standard prompt (no modifications)
-3. Record the model, provider, version, and date
-4. Analyze against the four invariants
-5. Save all generated code
-6. Submit analysis as a PR
+```yaml
+threat_pattern:
+  id: "TMKB-AUTHZ-NNN"
+  name: "Descriptive Name"
+  tier: "A"  # or "B"
+  version: "1.0.0"
+  last_updated: "YYYY-MM-DD"
 
-### 4. Bug Fixes and Code Improvements
+  category: "authorization"
+  subcategory: "relevant-subcategory"
+  language: "python"
+  framework: "flask"
 
-Standard code contributions:
+  severity: "critical|high|medium|low"
+  likelihood: "high|medium|low"
 
-- Fix bugs in the CLI, query engine, or MCP server
-- Improve test coverage
-- Optimize performance
-- Fix documentation errors
+  provenance:
+    source_type: "generalized_observation"
+    description: "Where this pattern comes from"
+    public_references:
+      - cwe: "CWE-NNN"
+        name: "CWE Name"
+        url: "https://cwe.mitre.org/..."
 
-### 5. Documentation
+  triggers:
+    keywords: ["keyword1", "keyword2"]
+    actions: ["creating something", "implementing something"]
+    file_patterns: ["**/relevant_files.py"]
 
-- Improve clarity of existing docs
-- Add usage examples
-- Fix broken links or outdated information
+  differentiation:
+    llm_knowledge_state: "What LLMs already know"
+    tmkb_value: "What TMKB adds beyond that"
+    llm_blindspots:
+      - "Specific thing LLMs get wrong"
 
-## Development Workflow
+  description: |
+    Multi-paragraph description of the threat.
 
-### Branch Naming
+  agent_summary:
+    threat: "One-line threat description"
+    check: "What to verify"
+    fix: "How to fix it"
 
-- `feature/description` -- New features
-- `fix/description` -- Bug fixes
-- `docs/description` -- Documentation only
-- `patterns/description` -- New or updated patterns
-
-### Making Changes
-
-1. **Fork** the repository
-2. **Create a branch** from `main`
-3. **Make changes** with clear, focused commits
-4. **Run tests**: `go test ./...`
-5. **Run linter**: `golangci-lint run ./...`
-6. **Validate patterns**: `./bin/tmkb validate --all`
-7. **Submit a PR** with a clear description
-
-### Commit Messages
-
-Follow conventional commit style:
-
+  mitigations:
+    - id: "MIT-AUTHZ-NNNa"
+      description: "How to mitigate"
+      effectiveness: "high|medium|low"
+      implementation_effort: "high|medium|low"
+      code_examples:
+        - language: "python"
+          framework: "flask"
+          description: "What this example shows"
+          vulnerable_code: |
+            # VULNERABLE: explanation
+          secure_code: |
+            # SECURE: explanation
 ```
-feat: add Node.js code examples for TMKB-AUTHZ-001
-fix: correct Wilson score calculation in scoring.go
-docs: update validation results with Run-7
-patterns: add TMKB-AUTHZ-006 tier-b essential pattern
-test: add integration tests for MCP query handler
+
+#### Additional Fields for Tier A
+
+Tier A patterns additionally require:
+
+- `attack_scenario` with narrative, preconditions, attack_steps, and impact
+- `security_principles` listing general principles this pattern illustrates
+- `generalizes_to` listing other frameworks where this pattern applies
+- `testing` with manual_verification and automated_checks
+- `validation.baseline_test` documenting LLM behavior without TMKB
+
+See `TMKB-AUTHZ-001.yaml` as the reference implementation for a complete Tier A pattern.
+
+### Agent Summary Guidelines
+
+The `agent_summary` is the most critical field — it's what AI agents consume. Keep it under 100 tokens total across all three fields:
+
+- **threat**: What goes wrong (one sentence)
+- **check**: What to verify in code (one sentence)
+- **fix**: How to fix it (one sentence)
+
+### Validation
+
+Every pattern must pass validation before merge:
+
+```bash
+# Validate a specific pattern
+./bin/tmkb validate --all
+
+# Verify it appears in queries
+./bin/tmkb query --context "your pattern's trigger keywords"
 ```
 
-### Pull Request Guidelines
+Validation checks:
+- All required fields are present and non-empty
+- Tier is `A` or `B`
+- Severity is `critical`, `high`, `medium`, or `low`
+- Agent summary exists with threat, check, and fix
+- At least one mitigation with ID and description
+- Tier A patterns have attack scenarios and code examples
 
-- **Title**: Short, descriptive (under 70 characters)
-- **Description**: Explain what and why (not just how)
-- **Testing**: Describe how you tested the changes
-- **Patterns**: If adding/modifying patterns, include `validate --all` output
-
-## Code Style
-
-### Go Code
-
-- Follow standard Go conventions (`gofmt`, `goimports`)
-- The project uses [golangci-lint](https://golangci-lint.run/) with 13 linters enabled
-- See `.golangci.yml` for the linter configuration
-- Run `golangci-lint run ./...` before submitting
-
-### Pattern YAML
-
-- Follow the structure in existing patterns (see [PATTERN_GUIDE.md](PATTERN_GUIDE.md))
-- Use `validate --all` to check pattern structure
-- Include both vulnerable and secure code examples
-
-### Documentation
-
-- Use Markdown
-- Keep lines readable
-- Include code examples where helpful
-- Link to related files and patterns
-
-## Testing
-
-### Running Tests
+## Running Tests
 
 ```bash
 # All tests
 go test ./...
 
-# With verbose output
-go test -v ./...
-
-# With race detection
-go test -race ./...
-
 # Specific package
 go test ./internal/knowledge/...
+go test ./internal/cli/...
+go test ./internal/mcp/...
 
-# Pattern validation
-./bin/tmkb validate --all
+# With verbose output
+go test -v ./...
 ```
 
-### Writing Tests
+## Pull Request Process
 
-- Add tests for new functionality
-- Use table-driven tests where appropriate
-- Test both success and error paths
-- Integration tests go in `*_integration_test.go` files
+1. Create a feature branch from `main`
+2. Make your changes
+3. Run `go test ./...` and `./bin/tmkb validate --all`
+4. Submit a PR with a clear description of what the pattern covers and why it matters
 
-## Questions?
+## What Makes a Good Pattern
 
-- Open a [GitHub Issue](https://github.com/mark-chris/tmkb/issues) for bugs or feature requests
-- Use [GitHub Discussions](https://github.com/mark-chris/tmkb/discussions) for questions and ideas
+- **Demonstrates a real LLM blindspot**: The pattern should address something LLMs consistently get wrong, not just general security advice
+- **Actionable**: The agent summary should give an AI agent enough context to generate secure code
+- **Grounded**: Include CWE/OWASP references where applicable
+- **Differentiated**: Explain what LLMs already know vs. what TMKB adds — if an LLM already handles this well, it doesn't belong here
 
-## Code of Conduct
+## Scope
 
-Be respectful, constructive, and professional. We're building security infrastructure -- accuracy and rigor matter more than speed.
+TMKB focuses on **authorization patterns in multi-tenant applications** — specifically architectural-level threats that cross system boundaries. Out of scope:
+
+- Syntax-level vulnerabilities (SQL injection, XSS) — LLMs handle these well already
+- Authentication (login, session management) — related but distinct domain
+- Infrastructure security (network, cloud config) — different layer
+- Non-authorization application security — future expansion possible
