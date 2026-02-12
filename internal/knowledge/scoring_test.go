@@ -110,7 +110,7 @@ func TestExtractKeywords_LongPhrase(t *testing.T) {
 	}
 
 	mustNotInclude := []string{
-		"multi tenant api background", // 4-gram
+		"multi tenant api background",                   // 4-gram
 		"multi tenant api background job authorization", // 6-gram
 	}
 

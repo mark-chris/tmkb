@@ -12,13 +12,6 @@ type initializeParams struct {
 	ClientInfo      map[string]interface{} `json:"clientInfo,omitempty"`
 }
 
-// initializeResult represents the initialize response result
-type initializeResult struct {
-	ProtocolVersion string                 `json:"protocolVersion"`
-	Capabilities    map[string]interface{} `json:"capabilities"`
-	ServerInfo      map[string]interface{} `json:"serverInfo"`
-}
-
 // handleInitialize handles the initialize request
 func handleInitialize(s *Server, params json.RawMessage) (interface{}, error) {
 	// Check if already initialized

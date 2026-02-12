@@ -39,7 +39,7 @@ func TestIntegration_AgentMode_RealPatterns(t *testing.T) {
 		t.Error("Expected token count to be calculated")
 	}
 
-	if result.TokenCount > TOKEN_LIMIT {
+	if result.TokenCount > tokenLimit {
 		if !result.TokenLimitReached {
 			t.Error("Token count exceeds limit but token_limit_reached not set")
 		}
@@ -274,9 +274,9 @@ func loadPatternsFromDir(t *testing.T) []ThreatPattern {
 // findPatternsDir locates the patterns directory relative to the test
 func findPatternsDir() string {
 	candidates := []string{
-		"../../patterns",           // From internal/knowledge
-		"./patterns",               // From repo root
-		"../patterns",              // Alternative
+		"../../patterns", // From internal/knowledge
+		"./patterns",     // From repo root
+		"../patterns",    // Alternative
 		filepath.Join(os.Getenv("TMKB_PATTERNS_DIR")), // Environment override
 	}
 

@@ -17,13 +17,13 @@ type QueryOptions struct {
 
 // QueryResult holds the results of a query
 type QueryResult struct {
-	PatternCount      int                     `json:"pattern_count"`
-	PatternsIncluded  int                     `json:"patterns_included"`
-	TokenCount        int                     `json:"token_count,omitempty"`
-	TokenLimitReached bool                    `json:"token_limit_reached,omitempty"`
-	Patterns          []PatternOutput         `json:"patterns,omitempty"`
-	VerbosePatterns   []PatternOutputVerbose  `json:"verbose_patterns,omitempty"`
-	CodePattern       *CodePatternOutput      `json:"code_pattern,omitempty"`
+	PatternCount      int                    `json:"pattern_count"`
+	PatternsIncluded  int                    `json:"patterns_included"`
+	TokenCount        int                    `json:"token_count,omitempty"`
+	TokenLimitReached bool                   `json:"token_limit_reached,omitempty"`
+	Patterns          []PatternOutput        `json:"patterns,omitempty"`
+	VerbosePatterns   []PatternOutputVerbose `json:"verbose_patterns,omitempty"`
+	CodePattern       *CodePatternOutput     `json:"code_pattern,omitempty"`
 }
 
 // PatternOutput is the agent-facing summary of a pattern
@@ -38,19 +38,19 @@ type PatternOutput struct {
 
 // PatternOutputVerbose is the human-facing detailed output
 type PatternOutputVerbose struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	Severity          string                `json:"severity"`
-	Likelihood        string                `json:"likelihood"`
-	Threat            string                `json:"threat"`
-	Check             string                `json:"check"`
-	Fix               string                `json:"fix"`
-	Description       string                `json:"description"`
-	AttackScenario    *AttackScenarioOutput `json:"attack_scenario,omitempty"`
-	Mitigations       []MitigationVerbose   `json:"mitigations"`
-	RelatedPatterns   []string              `json:"related_patterns,omitempty"`
-	CWEReferences     []string              `json:"cwe_references,omitempty"`
-	OWASPReferences   []string              `json:"owasp_references,omitempty"`
+	ID              string                `json:"id"`
+	Name            string                `json:"name"`
+	Severity        string                `json:"severity"`
+	Likelihood      string                `json:"likelihood"`
+	Threat          string                `json:"threat"`
+	Check           string                `json:"check"`
+	Fix             string                `json:"fix"`
+	Description     string                `json:"description"`
+	AttackScenario  *AttackScenarioOutput `json:"attack_scenario,omitempty"`
+	Mitigations     []MitigationVerbose   `json:"mitigations"`
+	RelatedPatterns []string              `json:"related_patterns,omitempty"`
+	CWEReferences   []string              `json:"cwe_references,omitempty"`
+	OWASPReferences []string              `json:"owasp_references,omitempty"`
 }
 
 // AttackScenarioOutput provides full attack scenario details

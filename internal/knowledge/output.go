@@ -9,9 +9,10 @@ import (
 // OutputFormat specifies the output format
 type OutputFormat string
 
+// Output format constants.
 const (
-	FormatJSON   OutputFormat = "json"
-	FormatText   OutputFormat = "text"
+	FormatJSON OutputFormat = "json"
+	FormatText OutputFormat = "text"
 )
 
 // FormatOutput formats a query result for display
@@ -34,7 +35,7 @@ func formatJSON(result QueryResult) (string, error) {
 	return string(data), nil
 }
 
-func formatText(result QueryResult, verbose bool) (string, error) {
+func formatText(result QueryResult, _ bool) (string, error) {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Found %d relevant threat pattern(s)\n", result.PatternCount))
@@ -56,7 +57,7 @@ func formatText(result QueryResult, verbose bool) (string, error) {
 	if result.CodePattern != nil {
 		sb.WriteString(strings.Repeat("=", 50) + "\n")
 		sb.WriteString("SECURE CODE TEMPLATE\n")
-		sb.WriteString(fmt.Sprintf("Language: %s | Framework: %s\n", 
+		sb.WriteString(fmt.Sprintf("Language: %s | Framework: %s\n",
 			result.CodePattern.Language, result.CodePattern.Framework))
 		sb.WriteString(strings.Repeat("-", 40) + "\n")
 		sb.WriteString(result.CodePattern.SecureTemplate)
@@ -91,7 +92,7 @@ func formatPatternText(p *ThreatPattern) string {
 
 	// Header
 	sb.WriteString(fmt.Sprintf("%s: %s\n", p.ID, p.Name))
-	sb.WriteString(fmt.Sprintf("Tier: %s | Severity: %s | Likelihood: %s\n", 
+	sb.WriteString(fmt.Sprintf("Tier: %s | Severity: %s | Likelihood: %s\n",
 		p.Tier, p.Severity, p.Likelihood))
 	sb.WriteString(fmt.Sprintf("Category: %s > %s\n", p.Category, p.Subcategory))
 	sb.WriteString(fmt.Sprintf("Language: %s | Framework: %s\n", p.Language, p.Framework))
@@ -129,7 +130,7 @@ func formatPatternText(p *ThreatPattern) string {
 				name = m.ID
 			}
 			sb.WriteString(fmt.Sprintf("[%s] %s\n", m.ID, name))
-			sb.WriteString(fmt.Sprintf("    Effectiveness: %s | Effort: %s\n", 
+			sb.WriteString(fmt.Sprintf("    Effectiveness: %s | Effort: %s\n",
 				m.Effectiveness, m.ImplementationEffort))
 			sb.WriteString(fmt.Sprintf("    %s\n\n", strings.Split(m.Description, "\n")[0]))
 		}

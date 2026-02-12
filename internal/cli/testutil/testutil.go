@@ -11,9 +11,9 @@ import (
 
 // TestFixture holds test resources and provides cleanup
 type TestFixture struct {
-	Dir      string                     // Temporary directory containing test patterns
-	Patterns []knowledge.ThreatPattern  // Loaded test patterns
-	Cleanup  func()                      // Cleanup function to remove temporary resources
+	Dir      string                    // Temporary directory containing test patterns
+	Patterns []knowledge.ThreatPattern // Loaded test patterns
+	Cleanup  func()                    // Cleanup function to remove temporary resources
 }
 
 // PatternWrapper handles the top-level threat_pattern key in YAML files

@@ -54,9 +54,9 @@ type ThreatPattern struct {
 
 // Provenance tracks the source of the threat pattern
 type Provenance struct {
-	SourceType        string             `yaml:"source_type" json:"source_type"`
-	Description       string             `yaml:"description" json:"description"`
-	PublicReferences  []PublicReference  `yaml:"public_references,omitempty" json:"public_references,omitempty"`
+	SourceType       string            `yaml:"source_type" json:"source_type"`
+	Description      string            `yaml:"description" json:"description"`
+	PublicReferences []PublicReference `yaml:"public_references,omitempty" json:"public_references,omitempty"`
 }
 
 // PublicReference links to external security resources
@@ -90,10 +90,10 @@ type AgentSummary struct {
 
 // AttackScenario describes how the vulnerability is exploited
 type AttackScenario struct {
-	Narrative     string        `yaml:"narrative" json:"narrative"`
-	Preconditions []string      `yaml:"preconditions" json:"preconditions"`
-	AttackSteps   []AttackStep  `yaml:"attack_steps" json:"attack_steps"`
-	Impact        Impact        `yaml:"impact" json:"impact"`
+	Narrative     string       `yaml:"narrative" json:"narrative"`
+	Preconditions []string     `yaml:"preconditions" json:"preconditions"`
+	AttackSteps   []AttackStep `yaml:"attack_steps" json:"attack_steps"`
+	Impact        Impact       `yaml:"impact" json:"impact"`
 }
 
 // AttackStep is a single step in an attack scenario
@@ -147,7 +147,7 @@ type RelatedPattern struct {
 
 // Testing provides guidance for verifying the pattern
 type Testing struct {
-	ManualVerification []ManualCheck   `yaml:"manual_verification,omitempty" json:"manual_verification,omitempty"`
+	ManualVerification []ManualCheck    `yaml:"manual_verification,omitempty" json:"manual_verification,omitempty"`
 	AutomatedChecks    []AutomatedCheck `yaml:"automated_checks,omitempty" json:"automated_checks,omitempty"`
 }
 

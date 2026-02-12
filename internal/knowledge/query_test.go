@@ -407,13 +407,13 @@ func TestQuery_VerboseMode_DefaultLimit(t *testing.T) {
 	patterns := make([]ThreatPattern, 15)
 	for i := 0; i < 15; i++ {
 		patterns[i] = ThreatPattern{
-			ID:       "TMKB-00" + string(rune('1'+i)),
-			Name:     "Pattern " + string(rune('1'+i)),
-			Severity: "high",
+			ID:         "TMKB-00" + string(rune('1'+i)),
+			Name:       "Pattern " + string(rune('1'+i)),
+			Severity:   "high",
 			Likelihood: "medium",
-			Category: "authorization",
-			Language: "python",
-			Framework: "flask",
+			Category:   "authorization",
+			Language:   "python",
+			Framework:  "flask",
 			Triggers: Triggers{
 				Keywords: []string{"authorization"},
 			},

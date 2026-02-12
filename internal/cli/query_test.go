@@ -218,7 +218,7 @@ func TestQueryCommand_LimitFlag(t *testing.T) {
 	index.Build(patterns)
 
 	// Set query parameters with limit
-	queryContext = "job authorization token"  // Matches multiple patterns
+	queryContext = "job authorization token" // Matches multiple patterns
 	queryLimit = 1
 
 	// Capture output
