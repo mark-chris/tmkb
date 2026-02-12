@@ -1,235 +1,238 @@
 # Top 10 Authorization Anti-Patterns AI Agents Make
 
-These are the most common authorization mistakes observed in AI-generated code across multiple providers and models. Each anti-pattern maps to one or more TMKB patterns.
+AI coding agents (LLMs) are strong at syntax-level security — they add `@login_required`, parameterize SQL queries, and escape output. But they systematically fail at **architectural authorization**: patterns that require reasoning across system boundaries, execution contexts, and object relationships.
+
+## Sourcing
+
+All 10 anti-patterns are grounded in established vulnerability classes (CWE, OWASP) and security design review experience. Every pattern in TMKB uses a provenance type of `generalized_observation` — these are well-known authorization failure modes, not novel research or proprietary incident data.
+
+Four of the 10 were additionally **validated as LLM blindspots** through empirical smoke tests across multiple providers (Anthropic, OpenAI, Google), models (Sonnet 4.5, Opus 4.6, GPT-5.2, Gemini), and application types (file upload, webhooks):
+
+| # | Anti-Pattern | Empirical Evidence |
+|---|-------------|-------------------|
+| 1 | Fire-and-Forget Background Jobs | **Validated**: 6/6 baseline runs failed across 3 providers and 2 app types |
+| 2 | List/Detail Authorization Mismatch | **Validated**: Observed in Run-5 (Gemini) |
+| 4 | Tenant Filter in Some Queries, Not All | **Validated**: Observed in Run-5 (Gemini) |
+| 5 | Org Membership != Resource Permission | **Validated**: Observed in Run-5 (Gemini) |
+| 3, 6-10 | Remaining patterns | **Not yet tested**: Hypothesized as likely LLM blindspots based on the same architectural reasoning, but not yet empirically validated |
+
+See the [cross-run comparison](../validation/smoke-test/baseline-cross-run-comparison.md) for full baseline test methodology and results.
+
+---
 
 ## 1. Fire-and-Forget Background Jobs
 
-**What happens:** Agent generates a background job that accepts only a resource ID. No user context, no tenant context, no re-authorization.
+**Pattern:** Agent adds auth to the HTTP endpoint, then enqueues a background job with only a resource ID. The worker processes any resource without re-checking authorization.
 
-**Example:**
-```python
-# Agent generates this 100% of the time without TMKB
-@celery.task
-def process_file(file_id):
-    file = File.query.get(file_id)  # Any file, any tenant
-    # ... process without authorization check
-```
-
-**Impact:** Cross-tenant data access via queue injection or TOCTOU attacks.
-
-**TMKB Pattern:** [TMKB-AUTHZ-001](../patterns/authorization/tier-a/TMKB-AUTHZ-001.yaml) - Background Job Authorization Context Loss
-
-**Observed in:** 6/6 baseline runs across Anthropic, OpenAI, and Google models.
-
----
-
-## 2. Webhook Payload Blind Trust
-
-**What happens:** Agent verifies webhook signatures at the HTTP endpoint but passes raw payload data to background workers without re-verification.
-
-**Example:**
-```python
-@app.route('/webhooks/stripe', methods=['POST'])
-def stripe_webhook():
-    verify_stripe_signature(request)  # Verified here
-    data = request.get_json()
-    process_stripe_event.delay(data)  # Raw data, no proof of verification
-
-@celery.task
-def process_stripe_event(data):
-    # Trusts data completely -- no re-verification
-    event_type = data.get('type')
-```
-
-**Impact:** Workers process unverified payloads; queue injection bypasses signature verification.
-
-**TMKB Pattern:** TMKB-AUTHZ-001 (async boundary generalization)
-
-**Observed in:** Run-6 baseline (webhook pattern test).
-
----
-
-## 3. Authenticated Equals Authorized
-
-**What happens:** Agent adds `@login_required` to endpoints but doesn't check whether the authenticated user can access the *specific* resource.
-
-**Example:**
-```python
-@app.route('/files/<int:file_id>')
-@login_required
-def get_file(file_id):
-    file = File.query.get_or_404(file_id)  # Any user's file!
-    return jsonify(file.to_dict())
-```
-
-**Impact:** Horizontal privilege escalation -- any authenticated user can access any resource by ID.
-
-**TMKB Pattern:** [TMKB-AUTHZ-005](../patterns/authorization/tier-a/TMKB-AUTHZ-005.yaml) - User/Account/Resource Ownership Confusion
-
----
-
-## 4. List/Detail Authorization Mismatch
-
-**What happens:** List endpoint filters by tenant, but detail endpoint doesn't (or vice versa).
-
-**Example:**
-```python
-@app.route('/files')
-@login_required
-def list_files():
-    files = File.query.filter_by(
-        organization_id=current_user.organization_id  # Filtered
-    ).all()
-
-@app.route('/files/<int:file_id>')
-@login_required
-def get_file(file_id):
-    file = File.query.get_or_404(file_id)  # NOT filtered
-    return jsonify(file.to_dict())
-```
-
-**Impact:** Resources invisible in list view are accessible via direct ID access.
-
-**TMKB Pattern:** [TMKB-AUTHZ-002](../patterns/authorization/tier-a/TMKB-AUTHZ-002.yaml) - List/Detail Authorization Inconsistency
-
----
-
-## 5. Client-Trusted Tenant ID
-
-**What happens:** Agent accepts the organization/tenant ID from the request body instead of deriving it from the authenticated session.
-
-**Example:**
-```python
-@app.route('/files', methods=['POST'])
-@login_required
-def upload_file():
-    org_id = request.json.get('organization_id')  # Client-provided!
-    file = File(organization_id=org_id, ...)
-```
-
-**Impact:** User can associate resources with any organization by providing a different tenant ID.
-
-**TMKB Pattern:** [TMKB-AUTHZ-004](../patterns/authorization/tier-a/TMKB-AUTHZ-004.yaml) - Tenant Isolation via Application Logic
-
-**Observed in:** Run-5 baseline (Gemini), where all endpoints accepted client-provided org IDs.
-
----
-
-## 6. Soft-Delete Ignorance in Async Processing
-
-**What happens:** Agent implements soft-delete (setting `deleted_at` timestamp) but background jobs don't check this flag.
-
-**Example:**
+**What the agent writes:**
 ```python
 @celery.task
-def process_file(file_id):
-    file = File.query.get(file_id)
-    # Doesn't check: if file.deleted_at: return
-    file.status = 'processing'  # Resurrects deleted file
+def process_file(self, file_id):       # No user_id, no org_id
+    file = File.query.get(file_id)     # Loads any file
+    # ... processes without authorization
 ```
 
-**Impact:** Deleted resources are processed, potentially leaking data or violating retention policies.
+**The blindspot:** Agents treat async boundaries as implementation details, not trust boundaries. They don't recognize that a Celery worker runs in a different security context than the Flask request.
 
-**TMKB Pattern:** [TMKB-AUTHZ-003](../patterns/authorization/tier-a/TMKB-AUTHZ-003.yaml) - Soft-Delete Resurrection Attack
+**Source:** CWE-862, CWE-863, OWASP API1:2023 | **Validated: 6/6 baseline runs failed** (3 providers, 4 models, 2 app types)
+
+**TMKB pattern:** [TMKB-AUTHZ-001](../patterns/authorization/tier-a/TMKB-AUTHZ-001.yaml)
 
 ---
 
-## 7. Security as "Production Concern"
+## 2. List/Detail Authorization Mismatch
 
-**What happens:** Agent generates placeholder comments instead of actual security implementations.
+**Pattern:** Agent correctly filters the list endpoint by tenant, but the detail endpoint fetches by primary key without verifying ownership.
 
-**Example:**
+**What the agent writes:**
 ```python
-def login():
-    user = User.query.filter_by(username=data['username']).first()
-    # In production: Verify password hash here
-    session['user_id'] = user.id
+# List: filtered
+files = File.query.filter_by(organization_id=current_user.org_id).all()
+
+# Detail: unfiltered
+file = File.query.get(file_id)         # Any file, any tenant
 ```
 
-**Impact:** No actual security -- authentication and authorization are deferred indefinitely.
+**The blindspot:** Agents implement list and detail views as independent code paths. They don't reason about whether the authorization contract is consistent across both.
 
-**Observed in:** Run-5 baseline (Gemini), which had multiple "In production" comments with no implementation.
+**Source:** CWE-862, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+
+**TMKB pattern:** [TMKB-AUTHZ-002](../patterns/authorization/tier-a/TMKB-AUTHZ-002.yaml)
 
 ---
 
-## 8. Endpoint-Only Authorization Thinking
+## 3. Soft-Delete Doesn't Mean Gone
 
-**What happens:** Agent treats authorization as an HTTP concern and doesn't consider other entry points (CLI scripts, management commands, data migrations, scheduled jobs).
+**Pattern:** Agent adds `deleted_at` filtering to read queries but not to update or processing queries. Deleted resources can be modified or resurrected.
 
-**Example:** Thorough endpoint authorization but a management command that processes all files regardless of tenant:
+**What the agent writes:**
 ```python
-# management/commands/reprocess.py
-def handle(self):
-    for file in File.query.filter_by(status='pending').all():
-        process_file.delay(file.id)  # No tenant context
+# Read: checks deleted_at
+files = File.query.filter(File.deleted_at.is_(None)).all()
+
+# Update: doesn't check
+file = File.query.get(file_id)         # Loads deleted files too
+file.name = request.json['name']       # Modifies "deleted" resource
 ```
 
-**Impact:** Non-HTTP entry points bypass all authorization checks.
+**The blindspot:** Agents treat soft-delete as a display concern (filter in listings) rather than an authorization boundary (resource should be inaccessible to all mutating operations).
 
-**TMKB Pattern:** TMKB-AUTHZ-001 (generalized to all async boundaries)
+**Source:** CWE-863, CWE-672 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-003](../patterns/authorization/tier-a/TMKB-AUTHZ-003.yaml)
 
 ---
 
-## 9. Missing Object Ownership on Mutations
+## 4. Tenant Filter in Some Queries, Not All
 
-**What happens:** Agent adds ownership checks on read endpoints but not on update/delete operations.
+**Pattern:** Agent adds tenant isolation to primary queries but misses it in joins, aggregations, search endpoints, or related-object lookups.
 
-**Example:**
+**What the agent writes:**
 ```python
-@app.route('/files/<int:file_id>')
-@login_required
-def get_file(file_id):
-    file = File.query.filter_by(
-        id=file_id, organization_id=current_user.org_id
-    ).first_or_404()  # Ownership check on read
+# Primary query: filtered
+files = File.query.filter_by(org_id=current_user.org_id).all()
 
-@app.route('/files/<int:file_id>', methods=['DELETE'])
-@login_required
-def delete_file(file_id):
-    file = File.query.get_or_404(file_id)  # No ownership check on delete!
-    db.session.delete(file)
+# Aggregation: unfiltered
+total = db.session.query(func.count(File.id)).scalar()  # All tenants
+
+# Related lookup: unfiltered
+comments = Comment.query.filter_by(file_id=file_id).all()  # Cross-tenant
 ```
 
-**Impact:** Users can delete resources belonging to other tenants.
+**The blindspot:** Agents apply tenant filtering as a local concern per-endpoint rather than a system invariant. They miss that every query touching tenant-scoped data needs the filter — not just the obvious ones.
 
-**TMKB Pattern:** TMKB-AUTHZ-002, TMKB-AUTHZ-005
+**Source:** CWE-863, CWE-284, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+
+**TMKB pattern:** [TMKB-AUTHZ-004](../patterns/authorization/tier-a/TMKB-AUTHZ-004.yaml)
 
 ---
 
-## 10. Authorization Logic Duplication Without Abstraction
+## 5. Org Membership != Resource Permission
 
-**What happens:** Agent copies authorization checks into each endpoint without a shared helper, leading to inconsistencies as endpoints are added.
+**Pattern:** Agent checks that a user belongs to an organization but doesn't check whether the user has permission to access the specific resource within that org.
 
-**Example:**
+**What the agent writes:**
 ```python
-# First endpoint: correct check
-file = File.query.filter_by(id=file_id, org_id=current_user.org_id).first()
-
-# Later endpoint: subtly different check
-file = File.query.filter_by(id=file_id).first()
-if file.user_id != current_user.id:  # Different field, different logic!
+# Checks org membership
+if current_user.org_id != file.org_id:
     abort(403)
+# But doesn't check: is this user allowed to access THIS file?
+# (e.g., private files, team-scoped resources, role-based access)
 ```
 
-**Impact:** Inconsistent authorization logic across endpoints; some resources accessible through weaker checks.
+**The blindspot:** Agents conflate three distinct authorization questions: "Is the user in the org?", "Does the org own this resource?", and "Can this user act on this resource?" Checking one doesn't imply the others.
 
-**TMKB Pattern:** TMKB-AUTHZ-002, TMKB-AUTHZ-004
+**Source:** CWE-863, CWE-639, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+
+**TMKB pattern:** [TMKB-AUTHZ-005](../patterns/authorization/tier-a/TMKB-AUTHZ-005.yaml)
 
 ---
 
-## Summary
+## 6. Mass Assignment of Ownership Fields
 
-| # | Anti-Pattern | Observed Rate | Severity |
-|---|---|---|---|
-| 1 | Fire-and-forget background jobs | 6/6 (100%) | Critical |
-| 2 | Webhook payload blind trust | 1/1 (100%) | High |
-| 3 | Authenticated = Authorized | 1/6 (17%) | High |
-| 4 | List/detail auth mismatch | 1/6 (17%) | High |
-| 5 | Client-trusted tenant ID | 1/6 (17%) | Critical |
-| 6 | Soft-delete ignorance in async | 6/6 (100%) | Medium |
-| 7 | Security as "production concern" | 1/6 (17%) | Critical |
-| 8 | Endpoint-only auth thinking | 6/6 (100%) | High |
-| 9 | Missing ownership on mutations | 1/6 (17%) | High |
-| 10 | Auth logic duplication | 4/6 (67%) | Medium |
+**Pattern:** Agent uses `request.json` directly to update model attributes, allowing clients to overwrite ownership fields like `organization_id`, `created_by`, or `role`.
 
-Anti-patterns 1, 2, 6, and 8 are **systematic** -- they appear across all providers and models. Anti-patterns 3, 5, and 7 were specific to weaker models (Gemini in Run-5).
+**What the agent writes:**
+```python
+data = request.get_json()
+for key, value in data.items():
+    setattr(file, key, value)          # Sets ANY field, including org_id
+```
+
+**The blindspot:** Agents focus on making the API functional (accept input, update model) without distinguishing user-settable fields from system-managed fields. They don't build an allowlist of mutable attributes.
+
+**Source:** CWE-915 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-006](../patterns/authorization/tier-b/TMKB-AUTHZ-006.yaml)
+
+---
+
+## 7. Authenticated != Authorized (IDOR)
+
+**Pattern:** Agent adds authentication (`@login_required`) and then fetches resources by ID from the URL without verifying the authenticated user is authorized to access that specific resource.
+
+**What the agent writes:**
+```python
+@login_required
+def get_file(file_id):
+    file = File.query.get(file_id)     # Any authenticated user, any file
+    return jsonify(file.to_dict())
+```
+
+**The blindspot:** Agents treat authentication as sufficient. Once a user is logged in, the agent trusts URL parameters as implicitly authorized. This is the classic IDOR pattern, but agents reproduce it because they reason about auth at the decorator level, not the data-access level.
+
+**Source:** CWE-639, OWASP API1:2023 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-007](../patterns/authorization/tier-b/TMKB-AUTHZ-007.yaml)
+
+---
+
+## 8. Status Transitions Without Permission Checks
+
+**Pattern:** Agent checks whether a user can update a resource, but doesn't check whether the user is allowed to make a specific state transition (e.g., draft -> published, pending -> approved).
+
+**What the agent writes:**
+```python
+file.status = request.json['status']   # Any status value accepted
+db.session.commit()                    # draft -> approved? Sure.
+```
+
+**The blindspot:** Agents treat status as just another field. They don't model that different transitions require different permissions (e.g., only admins can approve, only the author can submit for review).
+
+**Source:** CWE-863, CWE-841 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-009](../patterns/authorization/tier-b/TMKB-AUTHZ-009.yaml)
+
+---
+
+## 9. Parent Access != Child Access
+
+**Pattern:** Agent authorizes access to a parent resource but doesn't verify that the child resource actually belongs to that parent, or that the child has the same authorization requirements.
+
+**What the agent writes:**
+```python
+# GET /projects/123/comments/456
+project = Project.query.get(project_id)
+if project.org_id != current_user.org_id:
+    abort(403)
+comment = Comment.query.get(comment_id)  # Doesn't verify comment belongs to project
+```
+
+**The blindspot:** Agents implement nested routes by independently loading parent and child. They don't enforce the relationship — comment 456 might belong to a completely different project.
+
+**Source:** CWE-639 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-010](../patterns/authorization/tier-b/TMKB-AUTHZ-010.yaml)
+
+---
+
+## 10. Bulk Operations Skip Per-Item Auth
+
+**Pattern:** Agent enforces authorization on single-item endpoints but the bulk endpoint operates on a list of IDs without checking each one.
+
+**What the agent writes:**
+```python
+# Single: authorized
+def delete_file(file_id):
+    file = get_authorized_file(file_id)  # Checks ownership
+    db.session.delete(file)
+
+# Bulk: not authorized
+def bulk_delete():
+    ids = request.json['ids']
+    File.query.filter(File.id.in_(ids)).delete()  # Deletes any file
+```
+
+**The blindspot:** Agents treat bulk operations as performance optimizations of single operations, not as new authorization surfaces. They skip per-item checks in favor of batch queries that bypass ownership validation.
+
+**Source:** CWE-863 | **Not yet tested** — hypothesized LLM blindspot
+
+**TMKB pattern:** [TMKB-AUTHZ-012](../patterns/authorization/tier-b/TMKB-AUTHZ-012.yaml)
+
+---
+
+## The Common Thread
+
+All 10 anti-patterns share a root cause: **LLMs reason about authorization locally** (within a single function or endpoint) **but not across boundaries** (between execution contexts, between endpoints, between parent and child resources, between single and bulk operations).
+
+TMKB exists to inject this cross-boundary reasoning at the point where code is being generated. See the [README](../README.md) for validation results demonstrating the difference.
