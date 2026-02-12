@@ -5,7 +5,8 @@ import (
 	"log"
 )
 
-const TOKEN_LIMIT = 500
+// tokenLimit is the maximum token count for agent-mode responses.
+const tokenLimit = 500
 
 // buildAgentResponse builds a token-limited response for agent consumption
 func buildAgentResponse(candidates []*ThreatPattern, limit int) QueryResult {
@@ -40,7 +41,7 @@ func buildAgentResponse(candidates []*ThreatPattern, limit int) QueryResult {
 		patternTokens := counter.CountTokens(string(patternJSON))
 
 		// Check if adding this pattern would exceed limit
-		if patternsAdded > 0 && totalTokens+patternTokens > TOKEN_LIMIT {
+		if patternsAdded > 0 && totalTokens+patternTokens > tokenLimit {
 			result.TokenLimitReached = true
 			break
 		}
@@ -51,7 +52,7 @@ func buildAgentResponse(candidates []*ThreatPattern, limit int) QueryResult {
 		patternsAdded++
 
 		// If first pattern alone exceeds limit, mark it but continue
-		if patternsAdded == 1 && totalTokens > TOKEN_LIMIT {
+		if patternsAdded == 1 && totalTokens > tokenLimit {
 			result.TokenLimitReached = true
 			break
 		}
@@ -144,13 +145,7 @@ func buildVerboseResponse(candidates []*ThreatPattern, limit int) QueryResult {
 func convertCodeExamples(examples []CodeExample) []CodeExampleVerbose {
 	verbose := make([]CodeExampleVerbose, len(examples))
 	for i, ex := range examples {
-		verbose[i] = CodeExampleVerbose{
-			Language:       ex.Language,
-			Framework:      ex.Framework,
-			Description:    ex.Description,
-			VulnerableCode: ex.VulnerableCode,
-			SecureCode:     ex.SecureCode,
-		}
+		verbose[i] = CodeExampleVerbose(ex)
 	}
 	return verbose
 }

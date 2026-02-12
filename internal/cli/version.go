@@ -6,12 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	// Version is set at build time
-	Version   = "0.1.0"
-	GitCommit = "unknown"
-	BuildDate = "unknown"
-)
+// Version is the application version, set at build time via -ldflags.
+var Version = "0.1.0"
+
+// GitCommit is the git commit hash, set at build time via -ldflags.
+var GitCommit = "unknown"
+
+// BuildDate is the build date, set at build time via -ldflags.
+var BuildDate = "unknown"
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

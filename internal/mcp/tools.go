@@ -5,21 +5,10 @@ import (
 	"fmt"
 )
 
-// toolsListResult represents the tools/list response
-type toolsListResult struct {
-	Tools []interface{} `json:"tools"`
-}
-
 // toolsCallParams represents the tools/call request parameters
 type toolsCallParams struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`
-}
-
-// toolCallResult represents the tools/call response
-type toolCallResult struct {
-	Content []interface{} `json:"content"`
-	IsError bool          `json:"isError"`
 }
 
 // handleToolsList handles the tools/list request

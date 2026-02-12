@@ -5,15 +5,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/mark-chris/tmkb/internal/knowledge"
+	"github.com/spf13/cobra"
 )
 
 var (
 	// Global flags
-	patternsDir string
+	patternsDir  string
 	outputFormat string
-	verbose bool
+	verbose      bool
 
 	// Shared resources
 	loader *knowledge.Loader

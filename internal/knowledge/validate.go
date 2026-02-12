@@ -67,7 +67,7 @@ func Validate(p ThreatPattern) ValidationResult {
 	// Check agent summary token count (rough estimate: 1 token ≈ 4 chars)
 	agentSummaryLen := len(p.AgentSummary.Threat) + len(p.AgentSummary.Check) + len(p.AgentSummary.Fix)
 	if agentSummaryLen > 400 { // ~100 tokens
-		result.addWarning(p.ID, "agent_summary", 
+		result.addWarning(p.ID, "agent_summary",
 			fmt.Sprintf("may exceed 100 tokens (approx %d chars)", agentSummaryLen))
 	}
 
@@ -142,7 +142,7 @@ func (r *ValidationResult) validateTierA(p ThreatPattern) {
 	for i, m := range p.Mitigations {
 		for j, ex := range m.CodeExamples {
 			if ex.VulnerableCode == "" && ex.SecureCode == "" {
-				r.addWarning(p.ID, 
+				r.addWarning(p.ID,
 					fmt.Sprintf("mitigations[%d].code_examples[%d]", i, j),
 					"should have vulnerable_code and/or secure_code")
 			}

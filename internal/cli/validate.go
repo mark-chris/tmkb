@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/mark-chris/tmkb/internal/knowledge"
+	"github.com/spf13/cobra"
 )
 
 var (
