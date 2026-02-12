@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tmkb": {
+      "command": "/absolute/path/to/tmkb",
+      "args": ["serve"]
+    }
+  }
+}
