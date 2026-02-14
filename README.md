@@ -234,13 +234,19 @@ See [MCP Integration Guide](docs/mcp-integration.md) for detailed setup and trou
 
 ### Tier A (Full Depth)
 - **TMKB-AUTHZ-001**: Background Job Authorization Context Loss
-- TMKB-AUTHZ-002: List/Detail Authorization Inconsistency *(planned)*
-- TMKB-AUTHZ-003: Soft-Delete Resurrection Attack *(planned)*
-- TMKB-AUTHZ-004: Tenant Isolation via Application Logic *(planned)*
-- TMKB-AUTHZ-005: User/Account/Resource Ownership Confusion *(planned)*
+- **TMKB-AUTHZ-002**: List/Detail Authorization Inconsistency
+- **TMKB-AUTHZ-003**: Soft-Delete Resurrection Attack
+- **TMKB-AUTHZ-004**: Tenant Isolation via Application Logic
+- **TMKB-AUTHZ-005**: User/Account/Resource Ownership Confusion
 
 ### Tier B (Essential Coverage)
-- Additional patterns for common authorization failures *(planned)*
+- **TMKB-AUTHZ-006**: Mass Assignment of Ownership Fields
+- **TMKB-AUTHZ-007**: Insecure Direct Object Reference via Sequential IDs
+- **TMKB-AUTHZ-008**: Authorization Bypass via HTTP Method Override
+- **TMKB-AUTHZ-009**: State Transition Authorization Bypass
+- **TMKB-AUTHZ-010**: Unauthorized Access via Relationship Traversal
+- **TMKB-AUTHZ-011**: Authorization Check in Wrong Layer
+- **TMKB-AUTHZ-012**: Inconsistent Authorization in Bulk Operations
 
 ## Architecture
 
@@ -286,7 +292,7 @@ tmkb/
 │   │   ├── output.go      # Formatting
 │   │   └── validate.go    # Pattern validation
 │   ├── cli/               # CLI commands
-│   └── mcp/               # MCP server (WIP)
+│   └── mcp/               # MCP server
 ├── patterns/
 │   └── authorization/
 │       ├── tier-a/        # Full-depth patterns
