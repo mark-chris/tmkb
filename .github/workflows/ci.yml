@@ -80,7 +80,7 @@ jobs:
         cache: true
 
     - name: Run gosec
-      uses: securego/gosec@424fc4cd9c82ea0fd6bee9cd49c2db2c3cc0c93f # v2.22.11
+      uses: securego/gosec@398ad549bbf1a51dc978fd966169f660c59774de # v2.23.0
       with:
         args: '-fmt sarif -out gosec-results.sarif ./...'
 
@@ -97,7 +97,7 @@ jobs:
 
     - name: Run Trivy vulnerability scanner
       if: always()
-      uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+      uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
       with:
         scan-type: 'fs'
         scan-ref: '.'
