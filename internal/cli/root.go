@@ -101,6 +101,7 @@ func findPatternsDir() string {
 	}
 
 	for _, dir := range candidates {
+		dir = filepath.Clean(dir)
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			return dir
 		}
