@@ -31,37 +31,41 @@ Modern LLMs have substantial security knowledge for well-documented, syntax-leve
 
 ## Validation Results
 
-We ran **6 independent baseline tests** across **3 providers** and **2 application types**:
-- **Runs 1-5:** *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
+We ran **8 independent baseline tests** across **3 providers**, **5 models**, **2 application types**, and **2 extended-thinking configurations**:
+- **Runs 1-5, 7, 8:** *"Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"*
 - **Run-6:** *"Create a Flask API that receives webhooks from external services and processes them asynchronously"*
+- **Run-7:** Re-tests Opus 4.6 with `CLAUDE_CODE_EFFORT_LEVEL=high` (maximum extended thinking)
+- **Run-8:** Re-tests with Claude Opus 4.7, the newest Claude release
 
 ### Test Configuration
 
-| Run | Model | Provider | Application | Date | TMKB |
-|-----|-------|----------|-------------|------|------|
-| Run-1 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 3, 2026 | ❌ No |
-| Run-2 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 5, 2026 | ❌ No |
-| Run-3 | Claude Opus 4.6 | Anthropic | File upload | Feb 7, 2026 | ❌ No |
-| Run-4 | GPT-5.2 | OpenAI | File upload | Feb 8, 2026 | ❌ No |
-| Run-5 | Gemini | Google | File upload | Feb 8, 2026 | ❌ No |
-| Run-6 | Claude Sonnet 4.5 | Anthropic | **Webhook** | Feb 8, 2026 | ❌ No |
-| **Enhanced** | **Claude Sonnet 4.5** | **Anthropic** | **File upload** | **Feb 7, 2026** | ✅ **Yes** |
+| Run | Model | Provider | Application | Date | Thinking | TMKB |
+|-----|-------|----------|-------------|------|----------|------|
+| Run-1 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 3, 2026 | Default | ❌ No |
+| Run-2 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 5, 2026 | Default | ❌ No |
+| Run-3 | Claude Opus 4.6 | Anthropic | File upload | Feb 7, 2026 | Default | ❌ No |
+| Run-4 | GPT-5.2 | OpenAI | File upload | Feb 8, 2026 | N/A | ❌ No |
+| Run-5 | Gemini | Google | File upload | Feb 8, 2026 | N/A | ❌ No |
+| Run-6 | Claude Sonnet 4.5 | Anthropic | **Webhook** | Feb 8, 2026 | Default | ❌ No |
+| Run-7 | Claude Opus 4.6 | Anthropic | File upload | Feb 25, 2026 | **High** | ❌ No |
+| Run-8 | **Claude Opus 4.7** | Anthropic | File upload | May 14, 2026 | Default | ❌ No |
+| **Enhanced** | **Claude Sonnet 4.5** | **Anthropic** | **File upload** | **Feb 7, 2026** | Default | ✅ **Yes** |
 
 ### Results: Async Boundary Fails 100% Across All Providers and Application Types
 
-| Invariant | Run-1 | Run-2 | Run-3 | Run-4 | Run-5 | Run-6 | **Enhanced** |
-|-----------|-------|-------|-------|-------|-------|-------|------------|
-| Auth on mutating endpoints | ✅ | ✅ | ✅ | ✅ | ❌ | ✅¹ | ✅ |
-| Object ownership validated | ✅ | ✅ | ✅ | ✅ | ❌ | ❌² | ✅ |
-| List/detail consistency | ✅ | ✅ | ✅ | ✅ | ❌ | N/A | ✅ |
-| **Async boundary re-auth** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ **PASS** |
+| Invariant | Run-1 | Run-2 | Run-3 | Run-4 | Run-5 | Run-6 | Run-7 | Run-8 | **Enhanced** |
+|-----------|-------|-------|-------|-------|-------|-------|-------|-------|------------|
+| Auth on mutating endpoints | ✅ | ✅ | ✅ | ✅ | ❌ | ✅¹ | ✅ | ✅ | ✅ |
+| Object ownership validated | ✅ | ✅ | ✅ | ✅ | ❌ | ❌² | ✅ | ✅ | ✅ |
+| List/detail consistency | ✅ | ✅ | ✅ | ✅ | ❌ | N/A | ✅ | ✅ | ✅ |
+| **Async boundary re-auth** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ **PASS** |
 
 ¹ Run-6 uses webhook-specific invariants: W-INV-1 (origin verification) partial pass — GitHub HMAC correct, Stripe checks header presence only
 ² W-INV-2 (payload distrust) fail — all tasks blindly trust webhook payloads
 
-**Key Finding:** All 6 baseline runs failed the async boundary invariant across **3 providers** (Anthropic, OpenAI, Google), **4 models**, and **2 application types** (file upload, webhooks), demonstrating this is a **systematic, provider-invariant, application-type-invariant LLM blindspot**.
+**Key Finding:** All 8 baseline runs failed the async boundary invariant across **3 providers** (Anthropic, OpenAI, Google), **5 models**, **2 application types** (file upload, webhooks), and **2 extended-thinking configurations** (default and `high`), demonstrating this is a **systematic, provider-invariant, model-invariant, application-type-invariant, and reasoning-budget-invariant LLM blindspot**.
 
-Run-6 confirms the pattern generalizes: webhook signature verification at the HTTP boundary is not propagated to Celery workers, just as user authentication is not propagated to background jobs in runs 1-5.
+Run-6 confirms the pattern generalizes across application types: webhook signature verification at the HTTP boundary is not propagated to Celery workers, just as user authentication is not propagated to background jobs in runs 1-5. **Run-7 eliminates reasoning budget as a confound** — even with `CLAUDE_CODE_EFFORT_LEVEL=high`, the Opus 4.6 model produces the same INV-4 violation. **Run-8 extends this to the newest Claude release** — Opus 4.7 reproduces the identical task signature `(self, file_id)` with zero authorization checks, confirming a generational model upgrade does not surface the missing pattern.
 
 ### The Critical Difference
 
@@ -104,10 +108,11 @@ def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full cont
 
 ### Statistical Evidence
 
-- **Baseline async boundary failure rate:** 6/6 = 100% (3 providers, 4 models, 2 app types)
-- **95% confidence interval:** [61.0%, 100%] (Wilson score)
+- **Baseline async boundary failure rate:** 8/8 = 100% (3 providers, 5 models, 2 app types, 2 thinking configs)
+- **95% confidence interval:** [63.1%, 100%] (Wilson score)
 - **Enhanced success rate:** 1/1 = 100% (with TMKB context)
 - **Effect size:** 100 percentage point improvement
+- **Probability of 8/8 failures under a ≤50% baseline-failure null:** 0.39% (p < 0.005)
 
 ### What TMKB Adds
 
