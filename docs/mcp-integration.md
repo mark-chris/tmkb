@@ -134,7 +134,7 @@ TMKB returns:
 
 **Verify manually**:
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | /path/to/tmkb serve
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | /path/to/tmkb serve
 ```
 
 Should return initialize response.
@@ -181,7 +181,7 @@ Should return initialize response.
 
 ### MCP Protocol
 
-- **Protocol Version**: 2025-11-25
+- **Protocol Version**: negotiated — the client's requested version is echoed when supported (`2025-06-18`, `2025-03-26`, `2024-11-05`); otherwise the server falls back to `2025-06-18`
 - **Transport**: stdio (JSON-RPC 2.0 over stdin/stdout)
 - **Capabilities**: Tools only (no resources, prompts, or sampling)
 
@@ -257,6 +257,6 @@ ln -s /other/patterns/* /main/patterns/
 
 ## References
 
-- [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25)
+- [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18)
 - [Claude Code MCP Documentation](https://docs.anthropic.com/claude/docs/model-context-protocol)
 - [TMKB GitHub](https://github.com/mark-chris/tmkb)

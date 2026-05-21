@@ -12,6 +12,29 @@ type initializeParams struct {
 	ClientInfo      map[string]interface{} `json:"clientInfo,omitempty"`
 }
 
+// supportedProtocolVersions lists the MCP protocol revisions this server can
+// speak. The server echoes the client's requested version when it appears
+// here; otherwise it falls back to defaultProtocolVersion.
+var supportedProtocolVersions = map[string]bool{
+	"2025-06-18": true,
+	"2025-03-26": true,
+	"2024-11-05": true,
+}
+
+// defaultProtocolVersion is returned when the client requests a version this
+// server does not support. It must be a revision real MCP clients accept, so a
+// standards-compliant client can still complete the handshake.
+const defaultProtocolVersion = "2025-06-18"
+
+// negotiateProtocolVersion implements MCP version negotiation: echo the
+// client's requested version when supported, otherwise return our default.
+func negotiateProtocolVersion(requested string) string {
+	if supportedProtocolVersions[requested] {
+		return requested
+	}
+	return defaultProtocolVersion
+}
+
 // handleInitialize handles the initialize request
 func handleInitialize(s *Server, params json.RawMessage) (interface{}, error) {
 	// Check if already initialized
@@ -26,13 +49,9 @@ func handleInitialize(s *Server, params json.RawMessage) (interface{}, error) {
 		return nil, fmt.Errorf("invalid initialize params: %w", err)
 	}
 
-	// Version negotiation: support 2025-11-25 only
-	protocolVersion := "2025-11-25"
-	if p.ProtocolVersion != protocolVersion {
-		// Client requested unsupported version, respond with our version
-		// Client may disconnect if incompatible
-		protocolVersion = "2025-11-25"
-	}
+	// Negotiate the protocol version: echo the client's requested version when
+	// supported, otherwise fall back to our default.
+	protocolVersion := negotiateProtocolVersion(p.ProtocolVersion)
 
 	// Store protocol version and client capabilities
 	s.mu.Lock()
