@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -274,10 +273,10 @@ func loadPatternsFromDir(t *testing.T) []ThreatPattern {
 // findPatternsDir locates the patterns directory relative to the test
 func findPatternsDir() string {
 	candidates := []string{
-		"../../patterns", // From internal/knowledge
-		"./patterns",     // From repo root
-		"../patterns",    // Alternative
-		filepath.Join(os.Getenv("TMKB_PATTERNS_DIR")), // Environment override
+		"../../patterns",           // From internal/knowledge
+		"./patterns",               // From repo root
+		"../patterns",              // Alternative
+		os.Getenv("TMKB_PATTERNS"), // Environment override (matches the var honored by the CLI)
 	}
 
 	for _, dir := range candidates {

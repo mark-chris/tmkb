@@ -12,7 +12,7 @@ func TestServeStdio_InitializeFlow(t *testing.T) {
 	idx := knowledge.NewIndex()
 	srv := NewServer(idx)
 
-	input := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+	input := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 `
 
@@ -28,7 +28,7 @@ func TestServeStdio_InitializeFlow(t *testing.T) {
 	}
 
 	// First line should be initialize response
-	if !strings.Contains(lines[0], `"protocolVersion":"2025-11-25"`) {
+	if !strings.Contains(lines[0], `"protocolVersion":"2025-06-18"`) {
 		t.Error("expected initialize response")
 	}
 

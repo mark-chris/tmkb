@@ -15,7 +15,7 @@ func TestHandleMessage_Initialize(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  "initialize",
-		Params:  json.RawMessage(`{"protocolVersion":"2025-11-25","capabilities":{}}`),
+		Params:  json.RawMessage(`{"protocolVersion":"2025-06-18","capabilities":{}}`),
 	}
 	reqData, _ := json.Marshal(req)
 

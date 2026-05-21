@@ -22,7 +22,7 @@ func TestIntegration_FullSession(t *testing.T) {
 	srv := NewServer(idx)
 
 	// Build input: initialize -> initialized -> tools/list -> tools/call
-	input := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+	input := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/list"}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tmkb_query","arguments":{"context":"background job processing","language":"python"}}}
