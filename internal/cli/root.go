@@ -92,6 +92,16 @@ func init() {
 
 // findPatternsDir locates the patterns directory
 func findPatternsDir() string {
+	// An explicit TMKB_PATTERNS env var is authoritative: it is how MCP clients
+	// (see .mcp.json) point the stdio server at its patterns, since the server's
+	// working directory is the client's project, not the tmkb repo. Return it
+	// directly rather than falling through to the cwd-relative scan below, so a
+	// misconfigured path surfaces as a clear "failed to load patterns" error
+	// instead of silently falling back to cwd.
+	if env := os.Getenv("TMKB_PATTERNS"); env != "" {
+		return filepath.Clean(env)
+	}
+
 	// Check common locations
 	candidates := []string{
 		"patterns",
