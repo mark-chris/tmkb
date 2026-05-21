@@ -143,7 +143,7 @@ The key difference: without TMKB, Claude Code generates code that is functionall
 **"Server failed to start"**
 - Verify the path is absolute: `realpath bin/tmkb`
 - Check the binary is executable: `chmod +x bin/tmkb`
-- Test manually: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}' | ./bin/tmkb serve`
+- Test manually: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' | ./bin/tmkb serve`
 
 **Tool not appearing in Claude Code**
 - Restart Claude Code completely (quit and reopen)
