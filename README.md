@@ -1,19 +1,29 @@
 # Threat Model Knowledge Base (TMKB)
 
-> A security context source that agents, tools, and humans can consume—starting with threat patterns for authorization enforcement in multi-tenant applications.
+> A CLI and MCP server that feeds AI coding agents structured threat patterns, so they generate code that holds up at architectural security boundaries — starting with authorization in multi-tenant apps.
 
 [![CI](https://github.com/mark-chris/tmkb/workflows/CI/badge.svg)](https://github.com/mark-chris/tmkb/actions)
 [![CodeQL](https://github.com/mark-chris/tmkb/workflows/CodeQL/badge.svg)](https://github.com/mark-chris/tmkb/security/code-scanning)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Project](https://img.shields.io/badge/Project-TMKB%20MVP-blue)](https://github.com/users/mark-chris/projects/2)
 
-## What This Project Demonstrates
+> **Status:** MVP / research preview. The pattern set, query API, and MCP integration are stable enough to use; the validation methodology is the primary thing being iterated on.
 
-- **Threat modeling at architectural level** — Not syntax-level security; focuses on where authorization actually breaks across system boundaries
-- **Encoding tacit security judgment** — Captures design review expertise as structured, queryable data
-- **Understanding AI agent failure modes** — Documents what LLMs get wrong and provides corrective context
-- **Pragmatic validation methodology** — Includes baseline tests proving LLMs produce better code with TMKB
-- **Infrastructure thinking** — First component of a Security Context Plane for AI-assisted development
+When an agent asks TMKB about a context like "background job processing," it gets back a compact, structured pattern it can act on:
+
+```json
+{
+  "id": "TMKB-AUTHZ-001",
+  "severity": "high",
+  "threat": "Background jobs execute without the authorization context from the original request",
+  "check": "Verify authorization is re-checked in the job, not just the endpoint",
+  "fix": "Pass user_id and tenant_id to job; re-validate permissions before operating on resources"
+}
+```
+
+In baseline tests, 8/8 runs across 3 providers and 5 models failed to re-authorize at async boundaries. With TMKB context, the same prompt passes — adding 5 authorization checks and full tenant context to the generated background task.
+
+TMKB ships 12 authorization patterns today (5 tier-A, 7 tier-B) and is the first component of what we're calling a Security Context Plane for AI-assisted development.
 
 ## The Problem
 
@@ -125,6 +135,14 @@ def process_file_task(self, file_id, user_id, organization_id):  # ✅ Full cont
 | Security-focused tests | 0 | ~15 tests | **+15** |
 
 See [cross-run comparison](validation/smoke-test/baseline-cross-run-comparison.md) and individual run analyses in [validation/smoke-test/baseline/](validation/smoke-test/baseline/) for details.
+
+## Why This Project Exists
+
+- **Threat modeling at architectural level** — Not syntax-level security; focuses on where authorization actually breaks across system boundaries
+- **Encoding tacit security judgment** — Captures design review expertise as structured, queryable data
+- **Understanding AI agent failure modes** — Documents what LLMs get wrong and provides corrective context
+- **Pragmatic validation methodology** — Includes baseline tests proving LLMs produce better code with TMKB
+- **Infrastructure thinking** — First component of a Security Context Plane for AI-assisted development
 
 ## Installation
 
