@@ -138,4 +138,4 @@ This is a high-signal datapoint: **Opus 4.7, identical prompt, superpowers OFF o
 - **Sonnet enhanced (superpowers ON):** `validation/smoke-test/enhanced/tmkb-enhanced-analysis.md`
 - **Invariants:** `validation/INVARIANTS.md`
 - **Protocol & experimental conditions:** `validation/PROTOCOL.md`
-- **Optional clean Sonnet (superpowers-Off) re-run setup:** `validation/smoke-test/CLEAN-RERUN-SETUP.md`
+- **Running a controlled pair (+ optional superpowers-Off Sonnet datapoint):** `validation/PROTOCOL.md` → Experimental Conditions

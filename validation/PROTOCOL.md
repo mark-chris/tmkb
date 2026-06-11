@@ -64,8 +64,8 @@ Runs 4, 5, 8 had it Off.
 > process framework present *and* absent. Note on test coverage: TMKB alone does
 > **not** produce a test suite — the superpowers-Off Opus 4.7 run shipped none
 > despite full TMKB context — so test-suite presence is not counted as a TMKB
-> deliverable. `validation/smoke-test/CLEAN-RERUN-SETUP.md` describes how to add a
-> superpowers-Off Sonnet datapoint if you want one (optional; the Sonnet pair is
+> deliverable. The optional **Running a controlled pair** recipe below describes how
+> to add a superpowers-Off Sonnet datapoint if you want one (the Sonnet pair is
 > already valid).
 
 **Verifying superpowers availability for a past run.** Record the state per run
@@ -84,6 +84,69 @@ session, as it was for Run-8). The only authoritative per-run signal is that
 session's transcript — the SessionStart "You have superpowers" banner / the
 `superpowers:*` skill list. Non-Claude-Code runs (e.g. GPT, Gemini) cannot load it
 at all.
+
+### Running a controlled pair
+
+Hold everything constant across the pair except TMKB, and disable superpowers on
+both sides for the realistic "just TMKB" comparison (or hold it On on both — just
+match and record it).
+
+**Disable + verify superpowers.** Disable the plugin for the session, or run in a
+clean profile where it isn't installed. Before generating, confirm there are **no**
+`superpowers:*` skills and **no** "You have superpowers" / `using-superpowers`
+SessionStart banner. Record `Superpowers skill: Off` in the run's analysis doc.
+
+**Baseline side (TMKB Off).** Fresh directory and fresh conversation; **no**
+`.mcp.json`, no `tmkb` server, no `PreToolUse` hook, and no TMKB guidance in
+`CLAUDE.md`. Confirm `mcp__tmkb__tmkb_query` is not available, paste the prompt
+verbatim, save everything. Expect INV-4 to FAIL.
+
+**Enhanced side (TMKB On).** Fresh directory and conversation; identical prompt.
+Start the server (`TMKB_PATTERNS=<repo>/patterns <repo>/tmkb serve`) and wire the
+tool + auto-query hook in `.claude/settings.local.json` so patterns land before
+code is written:
+
+```json
+{
+  "permissions": { "allow": ["mcp__tmkb__tmkb_query"] },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "tmkb",
+            "tool": "tmkb_query",
+            "input": {
+              "context": "About to write or edit code (${tool_input.file_path}) in a multi-tenant Flask file-upload service. Surface authorization and trust-boundary threats before generating code: background-job auth context loss, tenant isolation, IDOR, soft-delete resurrection, ownership confusion.",
+              "language": "python",
+              "framework": "flask",
+              "verbosity": "agent"
+            },
+            "timeout": 15,
+            "statusMessage": "Consulting TMKB for authorization threats…"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Add the same TMKB design guidance to `CLAUDE.md` (consult `mcp__tmkb__tmkb_query`
+during design; authorization failures occur at boundaries, not functions). Confirm
+the agent calls `tmkb_query` / the hook fires, save everything. Expect all 4 to PASS.
+
+**Record + caveat.** Fill in the Experimental Conditions table for both runs and
+write a paired analysis like `tmkb-enhanced-opus-4-7-analysis.md`. **Do not** credit
+any generated test suite to TMKB — with superpowers Off, expect none; if one
+appears, keep it out of the TMKB delta.
+
+> **Optional Sonnet datapoint.** The Sonnet pair is already valid (superpowers On on
+> both sides). Running this recipe with Sonnet 4.5 and superpowers **Off** on both
+> sides adds a same-model Sonnet A/B at the same operating point as the Opus 4.7
+> pair — a two-model claim at matched conditions. Nice to have, not required.
 
 ## Baseline Test (Without TMKB)
 
