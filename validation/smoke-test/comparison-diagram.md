@@ -362,7 +362,6 @@ SECURE: Impossible to forget tenant filter
 │  Tenant isolation method         Manual   Automatic              │
 │  Query pattern                Two-step      Atomic                │
 │  TMKB references in code             0           6        +6     │
-│  Security test files                 0           1        +1     │
 │  Soft-delete protection             No         Yes               │
 │  Defense-in-depth layers             1           5        +4     │
 └──────────────────────────────────────────────────────────────────┘
@@ -496,7 +495,6 @@ Result: ✅ PROTECTED
 | **Tenant isolation** | Manual (fragile) | Automatic (robust) | Architectural |
 | **Query pattern** | Load then check | Filter then load | Structural |
 | **Security documentation** | Minimal | TMKB-referenced | Traceable |
-| **Test coverage** | Functional only | Security-focused | Comprehensive |
 | **Defense layers** | Single | Multiple | Defense-in-depth |
 
 **The Bottom Line:**

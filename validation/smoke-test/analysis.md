@@ -6,6 +6,18 @@
 
 ---
 
+> **⚠️ Correction (2026-06-10).** This comparison was generated with the
+> **superpowers** skill framework **ON** for the enhanced side and not on the
+> baseline. The `tests/test_security.py` suite referenced below is therefore a
+> **superpowers/TDD artifact, not a TMKB outcome** — the later Opus 4.7 enhanced
+> run (superpowers OFF) produced the same authorization architecture with **no**
+> test suite. Security-test claims have been removed from the metrics here; the
+> four *invariant* results stand. The clean, confound-free A/B is Opus 4.7
+> baseline (Run-8) vs. Opus 4.7 enhanced — see
+> [`enhanced/tmkb-enhanced-opus-4-7-analysis.md`](enhanced/tmkb-enhanced-opus-4-7-analysis.md).
+
+---
+
 ## Test Results Summary
 
 | Invariant | Baseline (No TMKB) | Enhanced (With TMKB) | Impact |
@@ -152,15 +164,12 @@ Security (TMKB-AUTHZ-001):
 
 ---
 
-### 3. Security Testing
+### 3. Security Testing — superpowers-attributable, not TMKB
 
-**Baseline:** No security-specific tests
-
-**Enhanced:** Comprehensive security test suite (`tests/test_security.py`):
-- Cross-tenant access denial tests
-- Background job authorization tests
-- Soft-delete resurrection tests
-- Ownership validation tests
+This run shipped a `tests/test_security.py` suite, but that output is attributable
+to the **superpowers** TDD framework (On for this run), **not** to TMKB. The Opus
+4.7 enhanced run produced the same authorization architecture with superpowers Off
+and no test suite. Do not count test coverage as a TMKB effect.
 
 ---
 
@@ -316,7 +325,6 @@ tests/
 **Enhanced structure benefits:**
 - Modular organization
 - `base.py` provides security foundation
-- Dedicated security tests
 - Clear separation of concerns
 
 ---
@@ -327,8 +335,6 @@ tests/
 |--------|----------|----------|
 | **Authorization checks in background job** | 0 | 5 |
 | **TMKB pattern references in code** | 0 | 6 |
-| **Security-specific test files** | 0 | 1 |
-| **Security-focused test cases** | 0 | ~15 |
 | **Tenant isolation enforcement** | Manual | Automatic |
 | **Soft-delete implementation** | No | Yes |
 | **Code documentation (security)** | Minimal | Comprehensive |

@@ -96,7 +96,14 @@ If the true failure rate were 50%, the probability of observing 6/6 failures is 
 | Authorization checks in task | 0 | 5 | +5 |
 | Architectural patterns | 0 | 1 (TenantScopedMixin) | +1 |
 | TMKB pattern references | 0 | 6 | +6 |
-| Security-focused tests | 0 | ~15 | +15 |
+
+> **Note on test coverage.** A "security-focused tests" row was removed here. That
+> test suite was produced by the **superpowers** TDD framework (On for the Sonnet
+> enhanced run), **not** by TMKB — the later Opus 4.7 enhanced run (superpowers Off)
+> produced the same authorization architecture with no test suite. The clean,
+> confound-free A/B is Opus 4.7 baseline (Run-8) vs. Opus 4.7 enhanced; see
+> [`tmkb-enhanced-opus-4-7-analysis.md`](../validation/smoke-test/enhanced/tmkb-enhanced-opus-4-7-analysis.md)
+> and [Experimental Conditions](../validation/PROTOCOL.md).
 
 ## The Smoking Gun: Task Signatures
 
@@ -161,7 +168,8 @@ def process_file_task(self, file_id, user_id, organization_id):
 - [Run-4 Analysis](../validation/smoke-test/baseline/run-4-analysis.md)
 - [Run-5 Analysis](../validation/smoke-test/baseline/run-5-analysis.md)
 - [Run-6 Webhook Analysis](../validation/smoke-test/baseline/run-6-webhook-analysis.md)
-- [Enhanced Analysis](../validation/smoke-test/enhanced/tmkb-enhanced-analysis.md)
+- [Enhanced Analysis — Sonnet 4.5 (superpowers On)](../validation/smoke-test/enhanced/tmkb-enhanced-analysis.md)
+- [Enhanced Analysis — Opus 4.7 (clean A/B, superpowers Off)](../validation/smoke-test/enhanced/tmkb-enhanced-opus-4-7-analysis.md)
 - [Cross-Run Comparison](../validation/smoke-test/baseline-cross-run-comparison.md)
 
 ## Reproducibility

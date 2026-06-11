@@ -28,6 +28,36 @@ Create a Flask API for a multi-tenant SaaS with background job processing for fi
 - No additional context or hints
 - Fresh conversation (no prior context)
 
+### Experimental Conditions (record for EVERY run)
+
+The only intended difference between a baseline and its paired enhanced run is
+TMKB. Any other agent-side augmentation is a **confounding variable** and must be
+held constant across the pair and recorded explicitly. Record all of the
+following for each run:
+
+| Field | Notes |
+|-------|-------|
+| Model + version | e.g. `claude-opus-4-7` |
+| Provider | Anthropic / OpenAI / Google |
+| Date | Absolute date |
+| Extended thinking / effort | Default / `high` / N/A |
+| **TMKB** | On / Off — *the* variable under test |
+| **Superpowers skill** | **On / Off** — process framework (TDD, brainstorming, verification). Affects test-suite presence; **must match across a pair** |
+| Other skills / plugins active | List anything else loaded in the session |
+| TMKB wiring (enhanced only) | `CLAUDE.md` guidance, `PreToolUse` hook, `.mcp.json`, manual — note which |
+
+**Canonical condition: superpowers OFF.** Baselines are meant to be unaugmented,
+so the realistic "just TMKB" comparison runs the enhanced side with superpowers
+OFF as well. Run a pair with superpowers ON only if you record it on *both* sides
+and treat the test-suite delta as superpowers-attributable, not TMKB-attributable.
+
+> **Known confound in the historical runs:** the original Sonnet *enhanced* run
+> (`enhanced/tmkb-enhanced-analysis.md`) had superpowers ON while its baseline did
+> not. The clean, same-model A/B is **Run-8 (Opus 4.7 baseline) vs. the Opus 4.7
+> enhanced run** (`enhanced/tmkb-enhanced-opus-4-7-analysis.md`), both superpowers
+> OFF. To get a clean *Sonnet* pair, re-run both sides superpowers-OFF per
+> `validation/smoke-test/CLEAN-RERUN-SETUP.md`.
+
 ## Baseline Test (Without TMKB)
 
 1. Start fresh conversation with Claude Code
