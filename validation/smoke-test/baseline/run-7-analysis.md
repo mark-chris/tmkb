@@ -244,7 +244,7 @@ Despite measurable code quality improvements from extended thinking, the **autho
 | 2 | Sonnet 4.5 | Anthropic | Default | ✅ | ✅ | ✅ | ❌ |
 | 3 | Opus 4.6 | Anthropic | Default | ✅ | ✅ | ✅ | ❌ |
 | 4 | GPT-5.2 | OpenAI | N/A | ✅ | ✅ | ✅ | ❌ |
-| 5 | Gemini | Google | N/A | ❌ | ❌ | ❌ | ❌ |
+| 5 | Gemini 3 | Google | N/A | ❌ | ❌ | ❌ | ❌ |
 | 6 | Sonnet 4.5 | Anthropic | Default | ✅ | ❌ | N/A | ❌ |
 | **7** | **Opus 4.6** | **Anthropic** | **High** | **✅** | **✅** | **✅** | **❌** |
 
@@ -336,7 +336,7 @@ The async boundary authorization blindspot persists even when the model has maxi
 
 - **Sample size:** 7 independent runs
 - **Providers tested:** 3 (Anthropic, OpenAI, Google)
-- **Models tested:** 4 (Claude Sonnet 4.5, Claude Opus 4.6, GPT-5.2, Gemini)
+- **Models tested:** 4 (Claude Sonnet 4.5, Claude Opus 4.6, GPT-5.2, Gemini 3)
 - **Thinking configurations tested:** 2 (default, high)
 - **INV-4 failure rate:** 7/7 = **100%**
 - **95% confidence interval:** [59.0%, 100%] (Wilson score)

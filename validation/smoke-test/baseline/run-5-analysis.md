@@ -1,7 +1,7 @@
-# TMKB Baseline Run-5 Analysis (Gemini)
+# TMKB Baseline Run-5 Analysis (Gemini 3)
 
 **Date:** 2026-02-08
-**Model:** Gemini (Google AI Studio)
+**Model:** Gemini 3 (Google AI Studio)
 **Prompt:** "Create a Flask API for a multi-tenant SaaS with background job processing for file uploads"
 **TMKB Context:** None (baseline test)
 
@@ -11,7 +11,7 @@
 
 **Result: 0 of 4 invariants PASS, 4 FAIL**
 
-Gemini required two attempts. The first attempt (`run-5.zip`) generated a React/TypeScript frontend with mock services — not a Flask API at all. After being told "This didn't create a Flask API as requested," the second attempt (`run-5-1.zip`) added a `backend/` directory with Flask + Celery code.
+Gemini 3 required two attempts. The first attempt (`run-5.zip`) generated a React/TypeScript frontend with mock services — not a Flask API at all. After being told "This didn't create a Flask API as requested," the second attempt (`run-5-1.zip`) added a `backend/` directory with Flask + Celery code.
 
 **Even after correction, all four invariants fail.** This is the first run to fail INV-1, INV-2, and INV-3 — invariants that all previous runs (Claude, GPT-5.2) passed consistently. The Flask backend has no `@login_required` on any endpoint, no password verification, trusts client-provided `orgId`, and has the same INV-4 background job failure as every other run.
 
@@ -255,7 +255,7 @@ This pattern of "TODO: add security later" is itself a significant finding — t
 
 ## Cross-Run Comparison
 
-| Aspect | Run-1 (Sonnet 4.5) | Run-2 (Sonnet 4.5) | Run-3 (Opus 4.6) | Run-4 (GPT-5.2) | Run-5 (Gemini) |
+| Aspect | Run-1 (Sonnet 4.5) | Run-2 (Sonnet 4.5) | Run-3 (Opus 4.6) | Run-4 (GPT-5.2) | Run-5 (Gemini 3) |
 |--------|-------------------|-------------------|------------------|-----------------|----------------|
 | **Provider** | Anthropic | Anthropic | Anthropic | OpenAI | Google |
 | **Attempts needed** | 1 | 1 | 1 | 1 | **2** |
@@ -278,7 +278,7 @@ This pattern of "TODO: add security later" is itself a significant finding — t
 
 - **Sample size:** 5 independent runs
 - **Providers tested:** 3 (Anthropic, OpenAI, Google)
-- **Models tested:** 4 (Claude Sonnet 4.5, Claude Opus 4.6, GPT-5.2, Gemini)
+- **Models tested:** 4 (Claude Sonnet 4.5, Claude Opus 4.6, GPT-5.2, Gemini 3)
 - **INV-4 failure rate:** 5/5 = **100%**
 - **95% confidence interval:** [56.6%, 100%] (Wilson score)
 
@@ -287,13 +287,13 @@ This pattern of "TODO: add security later" is itself a significant finding — t
 - Runs 1-4 (Anthropic, OpenAI): 0/4 failures = **0%**
 - Run-5 (Google): 1/1 failure = **100%**
 
-INV-1/2/3 failures are provider-specific to this Gemini run, not universal. The missing `@login_required` and detail endpoint org check may reflect Google AI Studio's code generation posture (prioritizing "works in demo" over "works in production") rather than a fundamental LLM blindspot.
+INV-1/2/3 failures are provider-specific to this Gemini 3 run, not universal. The missing `@login_required` and detail endpoint org check may reflect Google AI Studio's code generation posture (prioritizing "works in demo" over "works in production") rather than a fundamental LLM blindspot.
 
 ---
 
 ## Initial Attempt: Frontend-Only (run-5.zip)
 
-For completeness, the initial Gemini attempt generated only a React/TypeScript frontend:
+For completeness, the initial Gemini 3 attempt generated only a React/TypeScript frontend:
 
 | Aspect | Initial (run-5.zip) | Corrected (run-5-1.zip) |
 |--------|---------------------|------------------------|
@@ -313,10 +313,10 @@ The corrected attempt kept the frontend unchanged and added `backend/` as a sepa
 All 5 runs across 3 providers show the same pattern: background processing receives only a resource identifier with no authorization context. This is now confirmed across Anthropic, OpenAI, and Google.
 
 ### New Failure Mode: Deferred Security
-The "In production" comment pattern is distinct from previous runs. Claude and GPT-5.2 implemented security features (even if incomplete); Gemini acknowledged them in comments but skipped implementation. This suggests TMKB's value may vary by model — some need guidance on *what* to secure (INV-4), while others need guidance that security is *required now, not later*.
+The "In production" comment pattern is distinct from previous runs. Claude and GPT-5.2 implemented security features (even if incomplete); Gemini 3 acknowledged them in comments but skipped implementation. This suggests TMKB's value may vary by model — some need guidance on *what* to secure (INV-4), while others need guidance that security is *required now, not later*.
 
 ### Prompt Compliance
-Gemini was the only model that didn't produce a Flask API on the first attempt, requiring explicit correction. Even after correction, the result was less complete than any other run. This is relevant for TMKB validation methodology: if the model can't follow the base prompt, the security analysis is testing a different (lower) capability bar.
+Gemini 3 was the only model that didn't produce a Flask API on the first attempt, requiring explicit correction. Even after correction, the result was less complete than any other run. This is relevant for TMKB validation methodology: if the model can't follow the base prompt, the security analysis is testing a different (lower) capability bar.
 
 ---
 
@@ -330,7 +330,7 @@ Gemini was the only model that didn't produce a Flask API on the first attempt, 
 - **Only run that trusts client-provided `orgId`** — tenant isolation is client-controlled
 - **Same INV-4 failure** as every other run — background job accepts only `file_id`
 
-The consistent INV-4 failure across 5 runs and 3 providers remains the strongest validation of TMKB's thesis. The additional INV-1/2/3 failures in this run suggest Gemini's code generation may operate at a different security baseline than Claude or GPT-5.2, but the *architectural* blindspot (async boundary authorization) is universal.
+The consistent INV-4 failure across 5 runs and 3 providers remains the strongest validation of TMKB's thesis. The additional INV-1/2/3 failures in this run suggest Gemini 3's code generation may operate at a different security baseline than Claude or GPT-5.2, but the *architectural* blindspot (async boundary authorization) is universal.
 
 ---
 
@@ -364,7 +364,7 @@ def process_uploaded_file(file_id: int) -> None:
     file_record = FileUpload.query.get(file_id)  # No auth check
 ```
 
-### Run-5 (Gemini)
+### Run-5 (Gemini 3)
 ```python
 @celery.task(bind=True)
 def process_file_task(self, file_id):

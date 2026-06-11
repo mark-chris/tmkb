@@ -55,7 +55,7 @@ See [PROTOCOL.md](../validation/PROTOCOL.md) for the full test protocol.
 | Run-2 | Feb 5, 2026 | Claude Sonnet 4.5 | Anthropic | File upload | No |
 | Run-3 | Feb 7, 2026 | Claude Opus 4.6 | Anthropic | File upload | No |
 | Run-4 | Feb 8, 2026 | GPT-5.2 | OpenAI | File upload | No |
-| Run-5 | Feb 8, 2026 | Gemini | Google | File upload | No |
+| Run-5 | Feb 8, 2026 | Gemini 3 | Google | File upload | No |
 | Run-6 | Feb 8, 2026 | Claude Sonnet 4.5 | Anthropic | Webhook | No |
 | Enhanced | Feb 7, 2026 | Claude Sonnet 4.5 | Anthropic | File upload | **Yes** |
 
@@ -74,7 +74,7 @@ See [PROTOCOL.md](../validation/PROTOCOL.md) for the full test protocol.
 
 1. **INV-4 (async boundary) failure rate: 6/6 = 100%** across all baseline runs
 2. **Provider-invariant**: Anthropic, OpenAI, and Google all fail INV-4
-3. **Model-invariant**: Sonnet 4.5, Opus 4.6, GPT-5.2, and Gemini all fail INV-4
+3. **Model-invariant**: Sonnet 4.5, Opus 4.6, GPT-5.2, and Gemini 3 all fail INV-4
 4. **Application-type-invariant**: Both file upload and webhook patterns fail at the async boundary
 5. **INV-1/2/3 generally pass**: Most models handle endpoint-level authorization correctly (Run-5 is the exception)
 6. **Enhanced run passes all 4**: TMKB context produces 5 authorization checks in the background job
@@ -122,7 +122,7 @@ def process_file(file_id):
 # Run-4 (GPT-5.2)
 def process_uploaded_file(file_id: int):
 
-# Run-5 (Gemini)
+# Run-5 (Gemini 3)
 def process_file_task(self, file_id):
 
 # Run-6 (Sonnet 4.5 -- Webhooks)
@@ -152,7 +152,7 @@ def process_file_task(self, file_id, user_id, organization_id):
 - Modern decorator patterns (`@app.post()`)
 - **Same INV-4 failure**
 
-### Google Gemini (Run-5)
+### Google Gemini 3 (Run-5)
 
 - Required two attempts (first produced React frontend)
 - No `@login_required` on any endpoint

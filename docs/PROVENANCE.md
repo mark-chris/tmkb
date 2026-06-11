@@ -64,7 +64,7 @@ All baseline test results are generated from AI coding agents using standard pro
 | Anthropic | Claude Sonnet 4.5 | Feb 3-8, 2026 |
 | Anthropic | Claude Opus 4.6 | Feb 7, 2026 |
 | OpenAI | GPT-5.2 | Feb 8, 2026 |
-| Google | Gemini | Feb 8, 2026 |
+| Google | Gemini 3 | Feb 8, 2026 |
 
 Test results reflect model behavior at the time of testing. Model behavior may change with updates.
 
