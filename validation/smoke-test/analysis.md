@@ -6,14 +6,15 @@
 
 ---
 
-> **⚠️ Correction (2026-06-10).** This comparison was generated with the
-> **superpowers** skill framework **ON** for the enhanced side and not on the
-> baseline. The `tests/test_security.py` suite referenced below is therefore a
-> **superpowers/TDD artifact, not a TMKB outcome** — the later Opus 4.7 enhanced
-> run (superpowers OFF) produced the same authorization architecture with **no**
-> test suite. Security-test claims have been removed from the metrics here; the
-> four *invariant* results stand. The clean, confound-free A/B is Opus 4.7
-> baseline (Run-8) vs. Opus 4.7 enhanced — see
+> **⚠️ Correction (2026-06-10).** Both sides of this comparison — the Sonnet
+> baselines (Run-1/2) and this Sonnet enhanced run — had the **superpowers** skill
+> framework **On**, so the pair is a valid A/B with TMKB as the only variable and
+> the four *invariant* results stand. But superpowers' TDD discipline is why a test
+> suite was possible at all: **TMKB alone does not produce one** — the later
+> superpowers-Off Opus 4.7 enhanced run shipped the same authorization architecture
+> with **no** tests. The `tests/test_security.py` claims below are therefore **not**
+> counted as a TMKB deliverable and have been removed from the metrics. The clean
+> superpowers-Off A/B is Opus 4.7 baseline (Run-8) vs. Opus 4.7 enhanced — see
 > [`enhanced/tmkb-enhanced-opus-4-7-analysis.md`](enhanced/tmkb-enhanced-opus-4-7-analysis.md).
 
 ---

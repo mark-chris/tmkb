@@ -47,31 +47,32 @@ We ran **8 independent baseline tests** across **3 providers**, **5 models**, **
 - **Run-7:** Re-tests Opus 4.6 with `CLAUDE_CODE_EFFORT_LEVEL=high` (maximum extended thinking)
 - **Run-8:** Re-tests with Claude Opus 4.7, the newest Claude release
 
-Two **TMKB-enhanced** runs accompany the baselines. The headline result is the
-**clean same-model A/B**: *Run-8 (Opus 4.7, no TMKB)* vs. *Enh (Opus 4.7)* — same
-model, same prompt, the **superpowers** skill framework Off on both sides, and
-**TMKB as the only variable.** The earlier *Enh (Sonnet)* run had superpowers On
-while its baseline did not; it is retained as supporting evidence, but its
-test-suite output is a superpowers artifact, not a TMKB effect (see
-[Experimental Conditions](validation/PROTOCOL.md)).
+Two **TMKB-enhanced** runs accompany the baselines, and each forms a clean A/B with
+its same-model, same-superpowers baseline: the **Sonnet pair** (the **superpowers**
+skill framework held **On** on both sides) and the **Opus 4.7 pair** (superpowers
+held **Off** on both sides). In both, **TMKB is the only variable** and it flips the
+async-boundary invariant — so the effect holds whether or not the process framework
+is present, while five superpowers-On baselines still fail. (TMKB alone does not
+produce a test suite: the superpowers-Off Opus 4.7 run shipped none despite full
+TMKB context, so test coverage is not counted as a TMKB deliverable — see
+[Experimental Conditions](validation/PROTOCOL.md).)
 
 ### Test Configuration
 
 | Run | Model | Provider | Application | Date | Thinking | TMKB | Superpowers |
 |-----|-------|----------|-------------|------|----------|------|-------------|
-| Run-1 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 3, 2026 | Default | ❌ No | n/r¹ |
-| Run-2 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 5, 2026 | Default | ❌ No | n/r¹ |
-| Run-3 | Claude Opus 4.6 | Anthropic | File upload | Feb 7, 2026 | Default | ❌ No | n/r¹ |
-| Run-4 | GPT-5.2 | OpenAI | File upload | Feb 8, 2026 | N/A | ❌ No | n/r¹ |
-| Run-5 | Gemini | Google | File upload | Feb 8, 2026 | N/A | ❌ No | n/r¹ |
-| Run-6 | Claude Sonnet 4.5 | Anthropic | **Webhook** | Feb 8, 2026 | Default | ❌ No | n/r¹ |
-| Run-7 | Claude Opus 4.6 | Anthropic | File upload | Feb 25, 2026 | **High** | ❌ No | n/r¹ |
-| Run-8 | **Claude Opus 4.7** | Anthropic | File upload | May 14, 2026 | Default | ❌ No | Off² |
+| Run-1 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 3, 2026 | Default | ❌ No | On |
+| Run-2 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 5, 2026 | Default | ❌ No | On |
+| Run-3 | Claude Opus 4.6 | Anthropic | File upload | Feb 7, 2026 | Default | ❌ No | On |
+| Run-4 | GPT-5.2 | OpenAI | File upload | Feb 8, 2026 | N/A | ❌ No | Off |
+| Run-5 | Gemini | Google | File upload | Feb 8, 2026 | N/A | ❌ No | Off |
+| Run-6 | Claude Sonnet 4.5 | Anthropic | **Webhook** | Feb 8, 2026 | Default | ❌ No | On |
+| Run-7 | Claude Opus 4.6 | Anthropic | File upload | Feb 25, 2026 | **High** | ❌ No | On |
+| Run-8 | **Claude Opus 4.7** | Anthropic | File upload | May 14, 2026 | Default | ❌ No | Off |
 | **Enh (Sonnet)** | Claude Sonnet 4.5 | Anthropic | File upload | Feb 7, 2026 | Default | ✅ **Yes** | **On** |
 | **Enh (Opus 4.7)** | **Claude Opus 4.7** | Anthropic | File upload | **Jun 10, 2026** | Default | ✅ **Yes** | **Off** |
 
-¹ Superpowers state was not recorded at run time for these runs (see [PROTOCOL.md → Experimental Conditions](validation/PROTOCOL.md)).
-² Confirmed Off (no superpowers framework active for this run). **Run-8 vs. Enh (Opus 4.7) is the clean A/B** — same model, superpowers Off on both, TMKB the only variable.
+**Two clean A/Bs.** Each enhanced run matches its same-model baseline on superpowers state, so TMKB is the only variable in each: the **Sonnet pair** (Run-1/2 vs. Enh (Sonnet), superpowers **On** both sides) and the **Opus 4.7 pair** (Run-8 vs. Enh (Opus 4.7), superpowers **Off** both sides). Five superpowers-On baselines (Runs 1, 2, 3, 6, 7) still fail the async-boundary invariant — the process framework alone does not close the gap.
 
 ### Results: Async Boundary Fails 100% Across All Providers and Application Types
 

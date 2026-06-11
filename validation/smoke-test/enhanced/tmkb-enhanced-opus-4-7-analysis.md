@@ -9,11 +9,19 @@
 
 ---
 
-## Why this run matters: it is the first clean A/B
+## Why this run matters: a clean A/B at the superpowers-Off operating point
 
-Every prior enhanced result compared a *Sonnet 4.5 enhanced* run against a *Sonnet baseline*. That comparison was also confounded by a second variable — the **superpowers** skill framework (TDD, brainstorming, verification-before-completion) was ON for that enhanced run but not described for the baseline.
+The corrected experimental log shows the **superpowers** skill framework (TDD,
+brainstorming, verification-before-completion) was held **constant within each
+pair**: the Sonnet baselines (Run-1/2) and the Sonnet enhanced run were all
+superpowers **On**, while Run-8 and this run are both superpowers **Off**. So the
+suite has *two* clean A/Bs — the **Sonnet pair** at superpowers-On and the **Opus
+4.7 pair** at superpowers-Off — and TMKB flips the async-boundary invariant in both.
+That the effect holds with the process framework present *and* absent is stronger
+evidence than either pair alone.
 
-This run removes the confound. It pairs directly against **Run-8** — the Claude Opus 4.7 *baseline* (`baseline/test-app-opus-4-7-analysis.md`):
+This document covers the superpowers-Off pair. It pairs directly against **Run-8** —
+the Claude Opus 4.7 *baseline* (`baseline/test-app-opus-4-7-analysis.md`):
 
 | Dimension | Run-8 (baseline) | This run (enhanced) |
 |-----------|------------------|---------------------|
@@ -22,7 +30,10 @@ This run removes the confound. It pairs directly against **Run-8** — the Claud
 | Superpowers skill | OFF | OFF |
 | **TMKB** | **OFF** | **ON** |
 
-**TMKB is the only variable that differs.** Any difference in the four invariants is therefore attributable to TMKB, not to the model generation, the reasoning budget, or a process framework.
+**TMKB is the only variable that differs.** Any difference in the four invariants is
+therefore attributable to TMKB, not to the model generation, the reasoning budget,
+or a process framework — and because superpowers is Off on both sides, this pair
+additionally shows TMKB needs no process-framework scaffolding to produce the fix.
 
 ---
 
@@ -97,7 +108,7 @@ This run is the evidence that **TMKB, not superpowers, produces the security arc
 - **Boundary mental model and `TMKB-AUTHZ-*` references** throughout the code.
 - **Non-invariant hardening:** per-org upload dirs + `secure_filename` + uuid prefix (traversal), user-enumeration-safe login, mass-assignment defense on `create_user`, and an ORM-level `before_update` guard blocking mutation of soft-deleted rows.
 
-What did **not** appear this run: a **security test suite**. The Sonnet enhanced run shipped `tests/test_security.py`; this run shipped no tests at all — matching its superpowers-OFF condition (and matching the Run-8 baseline, which also had none). This strongly indicates the test suite in the earlier run was a **superpowers/TDD artifact, not a TMKB outcome.** See the correction note in `tmkb-enhanced-analysis.md`. The takeaway is a cleaner value statement: **TMKB buys architecture; it does not, on its own, buy tests.**
+What did **not** appear this run: a **security test suite**. The Sonnet enhanced run shipped `tests/test_security.py`; this run shipped no tests at all despite full TMKB context (matching the superpowers-Off Run-8 baseline, which also had none). So **TMKB alone does not produce a test suite** — writing one needs the superpowers TDD discipline, which was active only for the Sonnet runs. And the Sonnet *baseline* (also superpowers-On, but without TMKB) did not produce a security suite either, so the suite looks like a **superpowers × TMKB interaction**: TDD supplies the habit, TMKB supplies the threats worth testing. Either way, test coverage is **not** counted as a standalone TMKB deliverable. See the correction note in `tmkb-enhanced-analysis.md`. The cleaner value statement: **TMKB buys architecture; it does not, on its own, buy tests.**
 
 ---
 
@@ -115,7 +126,7 @@ These do not change any invariant result but should be recorded:
 
 ## Bottom line
 
-This is the highest-signal datapoint in the suite: **Opus 4.7, identical prompt, superpowers OFF on both sides, TMKB the only difference — INV-4 goes from 0 authorization checks to 4, and the run passes all four invariants.** Combined with Run-8, the suite can now state a same-model, confound-free A/B rather than a cross-model, superpowers-confounded one.
+This is a high-signal datapoint: **Opus 4.7, identical prompt, superpowers OFF on both sides, TMKB the only difference — INV-4 goes from 0 authorization checks to 4, and the run passes all four invariants.** It is the superpowers-Off half of the evidence; the Sonnet pair (superpowers On on both sides) is the other clean A/B. Together they show TMKB flips INV-4 with the process framework both present and absent.
 
 > A generational upgrade (4.6 → 4.7) and extended thinking both failed to surface the async-boundary pattern in the baseline. TMKB supplies the missing knowledge — and does so without help from a process framework.
 
@@ -127,6 +138,4 @@ This is the highest-signal datapoint in the suite: **Opus 4.7, identical prompt,
 - **Sonnet enhanced (superpowers ON):** `validation/smoke-test/enhanced/tmkb-enhanced-analysis.md`
 - **Invariants:** `validation/INVARIANTS.md`
 - **Protocol & experimental conditions:** `validation/PROTOCOL.md`
-- **Clean Sonnet re-run setup:** `validation/smoke-test/CLEAN-RERUN-SETUP.md`
-</content>
-</invoke>
+- **Optional clean Sonnet (superpowers-Off) re-run setup:** `validation/smoke-test/CLEAN-RERUN-SETUP.md`

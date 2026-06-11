@@ -46,17 +46,27 @@ following for each run:
 | Other skills / plugins active | List anything else loaded in the session |
 | TMKB wiring (enhanced only) | `CLAUDE.md` guidance, `PreToolUse` hook, `.mcp.json`, manual — note which |
 
-**Canonical condition: superpowers OFF.** Baselines are meant to be unaugmented,
-so the realistic "just TMKB" comparison runs the enhanced side with superpowers
-OFF as well. Run a pair with superpowers ON only if you record it on *both* sides
-and treat the test-suite delta as superpowers-attributable, not TMKB-attributable.
+**What matters is that superpowers is held *constant* across a pair** — On on both
+sides, or Off on both sides — and recorded. A pair only confounds TMKB with the
+process framework if the two sides differ. Do **not** assume baselines are
+unaugmented: in the historical runs, Runs 1, 2, 3, 6, and 7 had superpowers On and
+Runs 4, 5, 8 had it Off.
 
-> **Known confound in the historical runs:** the original Sonnet *enhanced* run
-> (`enhanced/tmkb-enhanced-analysis.md`) had superpowers ON while its baseline did
-> not. The clean, same-model A/B is **Run-8 (Opus 4.7 baseline) vs. the Opus 4.7
-> enhanced run** (`enhanced/tmkb-enhanced-opus-4-7-analysis.md`), both superpowers
-> OFF. To get a clean *Sonnet* pair, re-run both sides superpowers-OFF per
-> `validation/smoke-test/CLEAN-RERUN-SETUP.md`.
+> **The two clean A/Bs.** Both enhanced runs happen to match their same-model
+> baselines on superpowers state, so each is a valid A/B with TMKB as the only
+> variable:
+> - **Sonnet pair** — Run-1/2 baseline and `enhanced/tmkb-enhanced-analysis.md`,
+>   superpowers **On** on both sides.
+> - **Opus 4.7 pair** — Run-8 baseline and
+>   `enhanced/tmkb-enhanced-opus-4-7-analysis.md`, superpowers **Off** on both sides.
+>
+> TMKB flips the async-boundary invariant in both, so the effect holds with the
+> process framework present *and* absent. Note on test coverage: TMKB alone does
+> **not** produce a test suite — the superpowers-Off Opus 4.7 run shipped none
+> despite full TMKB context — so test-suite presence is not counted as a TMKB
+> deliverable. `validation/smoke-test/CLEAN-RERUN-SETUP.md` describes how to add a
+> superpowers-Off Sonnet datapoint if you want one (optional; the Sonnet pair is
+> already valid).
 
 ## Baseline Test (Without TMKB)
 

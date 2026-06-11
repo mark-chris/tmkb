@@ -1,15 +1,20 @@
-# Clean Sonnet Re-run Setup (superpowers OFF, both sides)
+# Optional: Sonnet Pair at the superpowers-Off Operating Point
 
-**Goal:** produce a confound-free Sonnet 4.5 A/B to match the clean Opus 4.7 pair
-(Run-8 baseline vs. Opus 4.7 enhanced). The existing Sonnet enhanced run had the
-**superpowers** skill ON and its baseline did not, so that pair confounds TMKB
-with a process framework. To fix it, **re-run *both* sides with superpowers OFF**
-— swapping only the baseline is not enough, because it would still be compared
-against a superpowers-ON enhanced run.
+**Status: optional.** The existing Sonnet pair is **already a valid A/B** — the
+Sonnet baselines (Run-1/2) and the Sonnet enhanced run all had the **superpowers**
+skill **On**, so superpowers is held constant and TMKB is the only variable. There
+is no confound to fix.
 
-> Re-running only a new baseline does **not** decontaminate the pair. The
-> contaminated side is the *enhanced* run (superpowers ON). Both halves must share
-> the same superpowers state. We standardize on **OFF**.
+**Why you might still run this:** the two clean A/Bs currently sit at different
+superpowers operating points — Sonnet at **On**, Opus 4.7 at **Off**. Running a
+Sonnet pair with superpowers **Off** on both sides would give a same-model Sonnet
+A/B at the *same* operating point as Opus 4.7, isolating TMKB from the process
+framework on Sonnet too. Nice to have, not required.
+
+> The methodological rule that matters: **hold superpowers constant across a pair**
+> (On/On or Off/Off) and record it. A pair only confounds TMKB with the process
+> framework when the two sides differ — which none of the existing pairs do. This
+> setup simply produces an Off/Off Sonnet pair to match the Opus 4.7 one.
 
 ---
 
@@ -110,10 +115,9 @@ delta is Sonnet-vs-Opus and the TMKB setup is identical.
   including `Superpowers skill: OFF`.
 - Write a paired analysis like `tmkb-enhanced-opus-4-7-analysis.md`, framed as a
   same-model A/B.
-- Expectation: a **second** clean A/B (Sonnet) confirming TMKB flips INV-4 with no
-  superpowers and no model confound — giving a two-model generalization claim
-  (Sonnet **and** Opus, both unaugmented).
+- Expectation: a Sonnet A/B at the superpowers-**Off** operating point confirming
+  TMKB flips INV-4 with no process framework — giving a two-model generalization
+  claim at matched conditions (Sonnet **and** Opus, both unaugmented).
 - **Do not** credit any generated test suite to TMKB. With superpowers OFF, expect
   no security test suite; if one appears, note it but keep the test-coverage metric
   out of the TMKB delta.
-</content>
