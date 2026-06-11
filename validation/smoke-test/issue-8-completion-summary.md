@@ -119,15 +119,14 @@ This creates a **traceable link** between security requirements and implementati
 
 ---
 
-### 4. Security Testing
+### 4. Security Testing — superpowers-attributable, not TMKB
 
-**Baseline:** No security-specific test suite
-
-**Enhanced:** Comprehensive security tests (`tests/test_security.py`):
-- Cross-tenant access denial
-- Background job authorization validation
-- Soft-delete resurrection prevention
-- Ownership validation
+This run shipped `tests/test_security.py`, but that output came from the
+**superpowers** TDD framework (On for this run), **not** from TMKB. The later Opus
+4.7 enhanced run (superpowers Off) produced the same authorization architecture and
+INV-4 fix with **no** test suite, isolating the attribution. Test coverage is not
+counted as a TMKB effect. See
+[`enhanced/tmkb-enhanced-opus-4-7-analysis.md`](enhanced/tmkb-enhanced-opus-4-7-analysis.md).
 
 ---
 
@@ -137,7 +136,6 @@ This creates a **traceable link** between security requirements and implementati
 |--------|----------|----------|-------------|
 | Authorization checks in background job | 0 | 5 | **+5** |
 | TMKB pattern references in code | 0 | 6 | **+6** |
-| Security-specific test files | 0 | 1 | **+1** |
 | Tenant isolation enforcement | Manual | Automatic | **Architectural** |
 | Soft-delete implementation | No | Yes | **Defense-in-depth** |
 
@@ -205,7 +203,7 @@ The smoke test **conclusively validates TMKB's value proposition:**
 1. Baseline failed the critical background job authorization invariant
 2. Enhanced passed all invariants with 5 comprehensive checks
 3. Enhanced introduced architectural security patterns (TenantScopedMixin)
-4. Enhanced included security documentation and test coverage
+4. Enhanced included explicit, TMKB-referenced security documentation (the test coverage in this run came from the superpowers TDD framework, not TMKB)
 
 **Next steps:**
 1. Update README.md with validation results ✅ (completed)

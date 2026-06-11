@@ -7,6 +7,22 @@
 
 ---
 
+> **⚠️ Correction (2026-06-10) — superpowers confound.** This run was generated
+> with the **superpowers** skill framework (TDD, brainstorming,
+> verification-before-completion) **ON**, while its baseline was not. Superpowers'
+> TDD discipline — not TMKB — is the most likely source of the
+> `tests/test_security.py` suite credited below. The later **Opus 4.7 enhanced
+> run** (`tmkb-enhanced-opus-4-7-analysis.md`), generated with superpowers **OFF**,
+> produced the same authorization architecture and INV-4 fix but **no test suite**,
+> isolating the attribution: **TMKB produces the security architecture; the test
+> suite was a superpowers artifact.** Treat the "security tests" claims in the
+> sections below as superpowers-attributable, not TMKB-attributable. The clean,
+> confound-free A/B is Opus 4.7 baseline (Run-8) vs. Opus 4.7 enhanced. The four
+> *invariant* results in this document stand — superpowers does not write the
+> authorization architecture; TMKB does.
+
+---
+
 ## Executive Summary
 
 **Result: ALL 4 INVARIANTS PASS ✅**

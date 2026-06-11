@@ -263,7 +263,11 @@ process_stripe_webhook.delay({'type': 'payment_intent.succeeded', 'id': 'evt_fak
 
 ## Enhanced Comparison
 
-What the TMKB-enhanced code added (that all baselines lack):
+What the TMKB-enhanced code added (that all baselines lack). The figures below are
+from the Sonnet 4.5 enhanced run; the clean, confound-free A/B is the Opus 4.7
+enhanced run vs. its same-model baseline (Run-8) — see
+[`enhanced/tmkb-enhanced-opus-4-7-analysis.md`](enhanced/tmkb-enhanced-opus-4-7-analysis.md).
+Any test-suite output is attributable to the **superpowers** TDD framework, not TMKB.
 
 | Feature | Baseline Runs | Enhanced | Impact |
 |---------|--------------|----------|--------|
@@ -271,7 +275,6 @@ What the TMKB-enhanced code added (that all baselines lack):
 | Auth checks in task | **0** | **5** | +5 |
 | TenantScopedMixin | ❌ No | ✅ Yes | Architectural |
 | TMKB pattern refs | 0 | 6 | Traceability |
-| Security test suite | 0 | ~15 tests | Validation |
 | AuthorizationError | ❌ No | ✅ Yes | Explicit failures |
 | Soft-delete protection | ❌ No | ✅ Yes | Defense-in-depth |
 
