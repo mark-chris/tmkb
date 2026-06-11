@@ -12,7 +12,7 @@
 | Run-2 | 2026-02-05 | Claude Code | Sonnet 4.5 | Anthropic | Default | ❌ No | `baseline/run-2.zip` |
 | Run-3 | 2026-02-07 | Claude 4.6 | Opus 4.6 | Anthropic | Default | ❌ No | `baseline/run-3.zip` |
 | Run-4 | 2026-02-08 | GPT-5.2 (Codex) | GPT-5.2 | OpenAI | N/A | ❌ No | `baseline/run-4.zip` |
-| Run-5 | 2026-02-08 | Gemini | Gemini | Google | N/A | ❌ No | `baseline/run-5.zip`, `run-5-1.zip` |
+| Run-5 | 2026-02-08 | Gemini 3 | Gemini 3 | Google | N/A | ❌ No | `baseline/run-5.zip`, `run-5-1.zip` |
 | Run-6 | 2026-02-08 | Claude Code | Sonnet 4.5 | Anthropic | Default | ❌ No | `baseline/run-6-webhook.zip` |
 | Run-7 | 2026-02-25 | Claude Code | Opus 4.6 | Anthropic | **High** | ❌ No | `baseline/run-7/` |
 | Run-8 | 2026-05-14 | Claude Code | **Opus 4.7** | Anthropic | Default | ❌ No | `baseline/test-app-opus-4-7.tar.gz` |
@@ -55,7 +55,7 @@ Run-6 uses webhook-specific invariants (W-INV-1 through W-INV-4) that adapt the 
 |-------------------------------|-------|-------|-------|-------|-------|-------|-------|-------|-----------|
 | **INV-4 / W-INV-4** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **0/8 (0%)** |
 
-**Finding:** All eight independent runs failed the async boundary invariant across **3 providers** (Anthropic, OpenAI, Google), **5 models**, **2 application types** (file upload, webhooks), and **2 extended-thinking configurations** (default and `high`), demonstrating this is a **systematic, provider-invariant, model-invariant, application-type-invariant, and reasoning-budget-invariant LLM blindspot**. Run-5 (Gemini) additionally failed INV-1/2/3 — the only run to do so. Runs 7 and 8 specifically eliminate "more reasoning time" and "newer model generation" as plausible mitigations on their own.
+**Finding:** All eight independent runs failed the async boundary invariant across **3 providers** (Anthropic, OpenAI, Google), **5 models**, **2 application types** (file upload, webhooks), and **2 extended-thinking configurations** (default and `high`), demonstrating this is a **systematic, provider-invariant, model-invariant, application-type-invariant, and reasoning-budget-invariant LLM blindspot**. Run-5 (Gemini 3) additionally failed INV-1/2/3 — the only run to do so. Runs 7 and 8 specifically eliminate "more reasoning time" and "newer model generation" as plausible mitigations on their own.
 
 ---
 
@@ -89,7 +89,7 @@ def process_uploaded_file(file_id: int) -> None:
     file_record = FileUpload.query.get(file_id)  # No auth check
 ```
 
-### Run-5 (Gemini)
+### Run-5 (Gemini 3)
 ```python
 @celery.task(bind=True)
 def process_file_task(self, file_id):
@@ -219,7 +219,7 @@ While INV-4 failure is consistent, code quality and style varied:
 **Interpretation:**
 - **Variable across providers:** Code quality, style, edge case handling
 - **Consistent failure:** Authorization across async boundaries (100% across all providers and application types)
-- **Run-5 outlier:** Gemini failed at a more basic level than other models (no endpoint auth, client-trusted org ID)
+- **Run-5 outlier:** Gemini 3 failed at a more basic level than other models (no endpoint auth, client-trusted org ID)
 - **Run-6 confirms generalization:** Same model (Sonnet 4.5) with a different application type still fails the async boundary invariant
 
 This suggests the async boundary blindspot is **deeply rooted** in LLM reasoning and **invariant across providers, models, and application types**.
@@ -286,7 +286,7 @@ Any test-suite output is attributable to the **superpowers** TDD framework, not 
 
 - **Sample size:** 8 independent runs
 - **Providers tested:** 3 (Anthropic, OpenAI, Google)
-- **Models tested:** 5 (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, Gemini)
+- **Models tested:** 5 (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, Gemini 3)
 - **Application types tested:** 2 (file upload, webhooks)
 - **Thinking configurations tested:** 2 (default, high)
 - **Async boundary failure rate:** 8/8 = **100%**
@@ -359,7 +359,7 @@ If the true failure rate were ≤50%, the probability of observing 8/8 failures 
 
 **Conclusion:** Provider doesn't matter - the architectural blindspot is universal.
 
-### Google Gemini (Run-5)
+### Google Gemini 3 (Run-5)
 
 **Distinctive patterns:**
 - Required two attempts (first produced React frontend, not Flask API)
@@ -373,7 +373,7 @@ If the true failure rate were ≤50%, the probability of observing 8/8 failures 
 
 **Unique failure mode:** Failed all 4 invariants (others passed INV-1/2/3). Treats security as a "production concern" rather than a design-time requirement.
 
-**Conclusion:** Gemini has the same INV-4 blindspot as all other models, plus a lower baseline for endpoint-level security. The architectural blindspot is confirmed across 3 providers.
+**Conclusion:** Gemini 3 has the same INV-4 blindspot as all other models, plus a lower baseline for endpoint-level security. The architectural blindspot is confirmed across 3 providers.
 
 ---
 
@@ -383,7 +383,7 @@ If the true failure rate were ≤50%, the probability of observing 8/8 failures 
 
 1. **Systematic failure:** 100% baseline failure rate across 8 runs
 2. **Provider-invariant:** Anthropic, OpenAI, and Google all fail the async boundary invariant
-3. **Model-invariant:** Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, and Gemini all fail
+3. **Model-invariant:** Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, and Gemini 3 all fail
 4. **Generation-invariant:** Opus 4.6 (Runs 3, 7) and Opus 4.7 (Run-8) fail identically
 5. **Application-type-invariant:** Both file upload (runs 1-5, 7, 8) and webhook (run-6) patterns fail identically
 6. **Reasoning-budget-invariant:** Default thinking (most runs) and `high` extended thinking (run-7) both fail
@@ -437,7 +437,7 @@ Run-4 (GPT-5.2) had different strengths:
 - Single-file simplicity
 - Modern Python patterns
 
-Run-5 (Gemini) had unique weaknesses:
+Run-5 (Gemini 3) had unique weaknesses:
 - No endpoint authentication at all
 - Security deferred via "In production" comments
 - Wrong application type on first attempt
@@ -514,9 +514,9 @@ But fail adversarial security tests:
 **Eight independent baseline tests across three providers, five models, two application types, and two extended-thinking configurations demonstrate:**
 
 1. ✅ **100% consistent failure** on async boundary authorization (INV-4 / W-INV-4)
-2. ✅ **~86% consistent success** on endpoint authorization (INV-1/2/3) — only Run-5 (Gemini) fails them
+2. ✅ **~86% consistent success** on endpoint authorization (INV-1/2/3) — only Run-5 (Gemini 3) fails them
 3. ✅ **Provider-invariant** (Anthropic, OpenAI, and Google all fail identically)
-4. ✅ **Model-invariant** (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, and Gemini all fail)
+4. ✅ **Model-invariant** (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, and Gemini 3 all fail)
 5. ✅ **Generation-invariant** (Opus 4.6 in Run-3/7, Opus 4.7 in Run-8 — same failure pattern)
 6. ✅ **Application-type-invariant** (file upload and webhook patterns both fail)
 7. ✅ **Reasoning-budget-invariant** (default and `high` extended thinking both fail)
@@ -560,7 +560,7 @@ But fail adversarial security tests:
 - File: `validation/smoke-test/baseline/run-5-analysis.md`
 - Key finding: ❌ All 4 invariants fail (TMKB-AUTHZ-001, 002, 004, 005 vulnerable)
 - Task signature: `process_file_task(self, file_id)`
-- Model: Gemini (Google - 3rd provider)
+- Model: Gemini 3 (Google - 3rd provider)
 - Note: Required two attempts; first attempt produced React frontend, not Flask API
 
 ### Run-6 Evidence

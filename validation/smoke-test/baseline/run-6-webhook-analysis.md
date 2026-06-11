@@ -119,7 +119,7 @@ def stripe_webhook():
     task = process_stripe_webhook.delay(data)
 ```
 
-❌ Only checks if the `Stripe-Signature` header *exists*. Any non-empty value passes. The comment says "In production, use Stripe's library to verify" but the code doesn't verify. Same "deferred security" pattern seen in Gemini's Run-5.
+❌ Only checks if the `Stripe-Signature` header *exists*. Any non-empty value passes. The comment says "In production, use Stripe's library to verify" but the code doesn't verify. Same "deferred security" pattern seen in Gemini 3's Run-5.
 
 **Generic endpoint** (`app.py` lines 145-174) — Hardcoded key:
 ```python
@@ -306,7 +306,7 @@ No authentication on task status. Anyone can query any task ID to see webhook pr
 if not signature:
 ```
 
-Same "deferred security" pattern seen in Gemini's Run-5, where the model acknowledges the correct approach in a comment but implements a placeholder.
+Same "deferred security" pattern seen in Gemini 3's Run-5, where the model acknowledges the correct approach in a comment but implements a placeholder.
 
 ---
 
@@ -361,7 +361,7 @@ This suggests TMKB-AUTHZ-001 should be generalized beyond "background jobs" to "
 | 2 | Sonnet 4.5 | Anthropic | `@login_required` ✅ | `process_file.delay(file_id)` | ❌ No |
 | 3 | Opus 4.6 | Anthropic | `@login_required` ✅ | `process_file.delay(file_id)` | ❌ No |
 | 4 | GPT-5.2 | OpenAI | `@login_required` ✅ | `process_uploaded_file.delay(file_id)` | ❌ No |
-| 5 | Gemini | Google | None ❌ | `process_file_task.delay(new_file.id)` | ❌ No |
+| 5 | Gemini 3 | Google | None ❌ | `process_file_task.delay(new_file.id)` | ❌ No |
 | **6** | **Sonnet 4.5** | **Anthropic** | **HMAC ✅** | **`process_github_webhook.delay(data)`** | **❌ No** |
 
 **6/6 runs, 4 models, 3 providers, 2 application types: zero async re-validation.**

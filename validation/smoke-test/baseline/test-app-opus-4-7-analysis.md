@@ -200,7 +200,7 @@ None of this is present.
 | 2 | Sonnet 4.5 | Anthropic | Default | ✅ | ✅ | ✅ | ❌ |
 | 3 | Opus 4.6 | Anthropic | Default | ✅ | ✅ | ✅ | ❌ |
 | 4 | GPT-5.2 | OpenAI | N/A | ✅ | ✅ | ✅ | ❌ |
-| 5 | Gemini | Google | N/A | ❌ | ❌ | ❌ | ❌ |
+| 5 | Gemini 3 | Google | N/A | ❌ | ❌ | ❌ | ❌ |
 | 6 | Sonnet 4.5 | Anthropic | Default | ✅ | ❌ | N/A | ❌ |
 | 7 | Opus 4.6 | Anthropic | High | ✅ | ✅ | ✅ | ❌ |
 | **8** | **Opus 4.7** | **Anthropic** | **Default** | **✅** | **✅** | **✅** | **❌** |
@@ -226,7 +226,7 @@ Same canonical shape as runs 1–7. The newest Claude release does not surface t
 
 - **Sample size:** 8 independent runs
 - **Providers tested:** 3 (Anthropic, OpenAI, Google)
-- **Models tested:** 5 (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, Gemini)
+- **Models tested:** 5 (Sonnet 4.5, Opus 4.6, Opus 4.7, GPT-5.2, Gemini 3)
 - **Thinking configurations tested:** 2 (default, high)
 - **INV-4 failure rate:** 8/8 = **100%**
 - **95% confidence interval:** [63.1%, 100%] (Wilson score)

@@ -65,7 +65,7 @@ TMKB context, so test coverage is not counted as a TMKB deliverable — see
 | Run-2 | Claude Sonnet 4.5 | Anthropic | File upload | Feb 5, 2026 | Default | ❌ No | On |
 | Run-3 | Claude Opus 4.6 | Anthropic | File upload | Feb 7, 2026 | Default | ❌ No | On |
 | Run-4 | GPT-5.2 | OpenAI | File upload | Feb 8, 2026 | N/A | ❌ No | Off |
-| Run-5 | Gemini | Google | File upload | Feb 8, 2026 | N/A | ❌ No | Off |
+| Run-5 | Gemini 3 | Google | File upload | Feb 8, 2026 | N/A | ❌ No | Off |
 | Run-6 | Claude Sonnet 4.5 | Anthropic | **Webhook** | Feb 8, 2026 | Default | ❌ No | On |
 | Run-7 | Claude Opus 4.6 | Anthropic | File upload | Feb 25, 2026 | **High** | ❌ No | On |
 | Run-8 | **Claude Opus 4.7** | Anthropic | File upload | May 14, 2026 | Default | ❌ No | Off |

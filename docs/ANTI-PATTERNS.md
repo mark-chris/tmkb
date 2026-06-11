@@ -6,14 +6,14 @@ AI coding agents (LLMs) are strong at syntax-level security — they add `@login
 
 All 10 anti-patterns are grounded in established vulnerability classes (CWE, OWASP) and security design review experience. Every pattern in TMKB uses a provenance type of `generalized_observation` — these are well-known authorization failure modes, not novel research or proprietary incident data.
 
-Four of the 10 were additionally **validated as LLM blindspots** through empirical smoke tests across multiple providers (Anthropic, OpenAI, Google), models (Sonnet 4.5, Opus 4.6, GPT-5.2, Gemini), and application types (file upload, webhooks):
+Four of the 10 were additionally **validated as LLM blindspots** through empirical smoke tests across multiple providers (Anthropic, OpenAI, Google), models (Sonnet 4.5, Opus 4.6, GPT-5.2, Gemini 3), and application types (file upload, webhooks):
 
 | # | Anti-Pattern | Empirical Evidence |
 |---|-------------|-------------------|
 | 1 | Fire-and-Forget Background Jobs | **Validated**: 6/6 baseline runs failed across 3 providers and 2 app types |
-| 2 | List/Detail Authorization Mismatch | **Validated**: Observed in Run-5 (Gemini) |
-| 4 | Tenant Filter in Some Queries, Not All | **Validated**: Observed in Run-5 (Gemini) |
-| 5 | Org Membership != Resource Permission | **Validated**: Observed in Run-5 (Gemini) |
+| 2 | List/Detail Authorization Mismatch | **Validated**: Observed in Run-5 (Gemini 3) |
+| 4 | Tenant Filter in Some Queries, Not All | **Validated**: Observed in Run-5 (Gemini 3) |
+| 5 | Org Membership != Resource Permission | **Validated**: Observed in Run-5 (Gemini 3) |
 | 3, 6-10 | Remaining patterns | **Not yet tested**: Hypothesized as likely LLM blindspots based on the same architectural reasoning, but not yet empirically validated |
 
 See the [cross-run comparison](../validation/smoke-test/baseline-cross-run-comparison.md) for full baseline test methodology and results.
@@ -55,7 +55,7 @@ file = File.query.get(file_id)         # Any file, any tenant
 
 **The blindspot:** Agents implement list and detail views as independent code paths. They don't reason about whether the authorization contract is consistent across both.
 
-**Source:** CWE-862, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+**Source:** CWE-862, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini 3)
 
 **TMKB pattern:** [TMKB-AUTHZ-002](../patterns/authorization/tier-a/TMKB-AUTHZ-002.yaml)
 
@@ -101,7 +101,7 @@ comments = Comment.query.filter_by(file_id=file_id).all()  # Cross-tenant
 
 **The blindspot:** Agents apply tenant filtering as a local concern per-endpoint rather than a system invariant. They miss that every query touching tenant-scoped data needs the filter — not just the obvious ones.
 
-**Source:** CWE-863, CWE-284, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+**Source:** CWE-863, CWE-284, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini 3)
 
 **TMKB pattern:** [TMKB-AUTHZ-004](../patterns/authorization/tier-a/TMKB-AUTHZ-004.yaml)
 
@@ -122,7 +122,7 @@ if current_user.org_id != file.org_id:
 
 **The blindspot:** Agents conflate three distinct authorization questions: "Is the user in the org?", "Does the org own this resource?", and "Can this user act on this resource?" Checking one doesn't imply the others.
 
-**Source:** CWE-863, CWE-639, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini)
+**Source:** CWE-863, CWE-639, OWASP API1:2023 | **Validated: Observed in Run-5** (Gemini 3)
 
 **TMKB pattern:** [TMKB-AUTHZ-005](../patterns/authorization/tier-a/TMKB-AUTHZ-005.yaml)
 
