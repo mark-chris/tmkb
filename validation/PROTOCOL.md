@@ -68,6 +68,23 @@ Runs 4, 5, 8 had it Off.
 > superpowers-Off Sonnet datapoint if you want one (optional; the Sonnet pair is
 > already valid).
 
+**Verifying superpowers availability for a past run.** Record the state per run
+going forward. For historical runs, the install record bounds availability:
+
+- `~/.claude/plugins/installed_plugins.json` → the `superpowers@...` entry's
+  `installedAt` / `lastUpdated` (this environment: installed **2026-01-15**, last
+  updated 2026-05-06), and
+- the marketplace clone's git reflog:
+  `git -C ~/.claude/plugins/marketplaces/superpowers-marketplace reflog --date=iso`
+  (clone timestamp 2026-01-15).
+
+A run dated before `installedAt` could not have had superpowers; this does **not**
+prove per-session *enablement* (superpowers may be installed but disabled for a
+session, as it was for Run-8). The only authoritative per-run signal is that
+session's transcript — the SessionStart "You have superpowers" banner / the
+`superpowers:*` skill list. Non-Claude-Code runs (e.g. GPT, Gemini) cannot load it
+at all.
+
 ## Baseline Test (Without TMKB)
 
 1. Start fresh conversation with Claude Code
